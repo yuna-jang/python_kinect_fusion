@@ -165,6 +165,9 @@ class TSDFVolume:
         zv.reshape(1,-1)
       ], axis=0).astype(int).T
 
+  def set_vol_bnds(self, vol_bnds_new):
+    self._vol_bnds = vol_bnds_new
+
   @staticmethod
   @njit(parallel=True)
   def vox2world(vol_origin, vox_coords, vox_size):
