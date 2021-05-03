@@ -11,6 +11,7 @@ import fusion
 
 # Kinect module
 import pyk4a
+from helpers import colorize
 from pyk4a import Config, PyK4A
 
 
@@ -52,13 +53,14 @@ if __name__ == "__main__":
     if capture.depth is not None:
       iter = iter + 1
       # Read depth image and camera pose
+      cv2.imshow("Depth", colorize(capture.depth, (None, 5000)))
+      cv2.imshow("Color", capture.color)
+
       depth_im = capture.depth.astype(float)
       depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
       depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
 
       # KinectFusion에서 pose estimation하는 것을 참고하여 연산
-      #cam_pose = np.loadtxt("data/frame-%06d.pose.txt" % (1))  # 4x4 rigid transformation matrix
-
       raw = json.loads(k4a.calibration_raw)
       for params in raw["CalibrationInformation"]["InertialSensors"]:
         Rot = params["Rt"]["Rotation"]
