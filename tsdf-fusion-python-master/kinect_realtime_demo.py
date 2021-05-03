@@ -2,7 +2,6 @@
 """
 
 import time
-import json
 
 import cv2
 import numpy as np
@@ -14,6 +13,8 @@ import pyk4a
 from helpers import colorize
 from pyk4a import Config, PyK4A
 
+from icp_modules.ICP import ICP_point_to_point
+from icp_modules.FramePreprocessing import DepthMap,PointCloud
 
 if __name__ == "__main__":
   # ======================================================================================================== #
@@ -61,17 +62,29 @@ if __name__ == "__main__":
       depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
 
       # KinectFusion에서 pose estimation하는 것을 참고하여 연산
-      raw = json.loads(k4a.calibration_raw)
-      for params in raw["CalibrationInformation"]["InertialSensors"]:
-        Rot = params["Rt"]["Rotation"]
-        T = params["Rt"]["Translation"]
 
-      print('R',Rot)
-      print('T',T)
-      RT = np.hstack([np.reshape(Rot,(3,3)),np.reshape(T,(3,1))])
-      cam_pose = np.vstack([RT,[0,0,0,1]])
+      # Set first frame as world system
+      if iter == 1:
+        first_Depthmap = DepthMap(depth_im)
+        first_Points3D = PointCloud(first_Depthmap, np.linalg.inv(cam_intr))
+        continue
+      elif iter == 2:
+        second_Depthmap = DepthMap(depth_im)
+        second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
+        # ICP find Trans between neighboring frames
+        first_pose = ICP_point_to_point(first_Points3D, second_Points3D)
+        first_Points3D = second_Points3D
+        continue
+      else:
+        second_Depthmap = DepthMap(depth_im)
+        second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
+        # ICP find Trans between neighboring frames
+        pose = ICP_point_to_point(first_Points3D, second_Points3D)
+        cam_pose = np.dot(first_pose, pose)
+        first_Points3D = second_Points3D
+        first_pose = cam_pose
 
-      print('cam_pose', cam_pose)
+      cam_pose = np.loadtxt("data/frame-%06d.pose.txt" % (3))  # 4x4 rigid transformation matrix
 
 
       # Compute camera view frustum and extend convex hull
@@ -85,7 +98,7 @@ if __name__ == "__main__":
       # ======================================================================================================== #
       # Initialize voxel volume
       print("Initializing voxel volume...")
-      if iter == 1:
+      if iter == 3:
         tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.01)
       else:
         tsdf_vol.set_vol_bnds(vol_bnds)
