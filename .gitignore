@@ -259,6 +259,8 @@ pip-selfcheck.json
 .idea/mongoSettings.xml
 
 .idea/
+*.ply
+
 
 ## File-based project format:
 *.iws
