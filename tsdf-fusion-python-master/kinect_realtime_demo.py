@@ -65,18 +65,18 @@ if __name__ == "__main__":
 
       # Set first frame as world system
       if iter == 1:
-        first_Depthmap = DepthMap(depth_im)
+        first_Depthmap = depth_im
         first_Points3D = PointCloud(first_Depthmap, np.linalg.inv(cam_intr))
         continue
       elif iter == 2:
-        second_Depthmap = DepthMap(depth_im)
+        second_Depthmap = depth_im
         second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
         # ICP find Trans between neighboring frames
         first_pose = ICP_point_to_point(first_Points3D, second_Points3D)
         first_Points3D = second_Points3D
         continue
       else:
-        second_Depthmap = DepthMap(depth_im)
+        second_Depthmap = depth_im
         second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
         # ICP find Trans between neighboring frames
         pose = ICP_point_to_point(first_Points3D, second_Points3D)
