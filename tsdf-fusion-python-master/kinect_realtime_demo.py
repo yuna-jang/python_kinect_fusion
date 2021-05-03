@@ -54,7 +54,7 @@ if __name__ == "__main__":
       iter = iter + 1
       # Read depth image and camera pose
       cv2.imshow("Depth", colorize(capture.depth, (None, 5000)))
-      cv2.imshow("Color", capture.color)
+      cv2.imshow("Color", capture.transformed_color)
 
       depth_im = capture.depth.astype(float)
       depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
@@ -94,7 +94,7 @@ if __name__ == "__main__":
       print("Fusing frame")
 
       # Read RGB-D image and camera pose
-      color_image = cv2.cvtColor(capture.color,cv2.COLOR_BGR2RGB)
+      color_image = cv2.cvtColor(capture.transformed_color,cv2.COLOR_BGR2RGB)
       depth_im =capture.depth.astype(float)
       depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
       depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
