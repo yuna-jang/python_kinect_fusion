@@ -70,6 +70,7 @@ if __name__ == "__main__":
       cam_pose = np.vstack([RT,[0,0,0,1]])
 
       print('cam_pose', cam_pose)
+      김민수
 
 
       # Compute camera view frustum and extend convex hull
