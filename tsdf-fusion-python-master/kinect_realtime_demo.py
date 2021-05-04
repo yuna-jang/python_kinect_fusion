@@ -2,17 +2,20 @@
 """
 
 import time
-import json
 
 import cv2
 import numpy as np
+np.set_printoptions(threshold=np.inf)
 
 import fusion
 
 # Kinect module
 import pyk4a
+from helpers import colorize
 from pyk4a import Config, PyK4A
 
+from icp_modules.ICP import ICP_point_to_point
+from icp_modules.FramePreprocessing import DepthMap,PointCloud
 
 if __name__ == "__main__":
   # ======================================================================================================== #
@@ -51,26 +54,48 @@ if __name__ == "__main__":
     capture = k4a.get_capture()
     if capture.depth is not None:
       iter = iter + 1
-      # Read depth image and camera pose
-      depth_im = capture.depth.astype(float)
+
+      # Read depth and color image
+      depth_im = capture.transformed_depth.astype(float)
       depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
       depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
+      color_image = cv2.cvtColor(capture.color,cv2.COLOR_BGR2RGB)
+
+      # Show
+      cv2.imshow("Depth", colorize(capture.transformed_depth, (None, 5000)))
+      cv2.imshow("Color", capture.color)
+      cv2.imwrite(rf"D:\2021\Yonsei\Research\python_kinect_fusion\tsdf-fusion-python-master\image_step\{iter}_color.jpg",capture.color)
+      cv2.imwrite(rf"D:\2021\Yonsei\Research\python_kinect_fusion\tsdf-fusion-python-master\image_step\{iter}_depth.jpg",colorize(capture.transformed_depth, (None, 5000)))
+      print(colorize(capture.depth, (None, 5000)))
+
 
       # KinectFusion에서 pose estimation하는 것을 참고하여 연산
-      #cam_pose = np.loadtxt("data/frame-%06d.pose.txt" % (1))  # 4x4 rigid transformation matrix
 
-      raw = json.loads(k4a.calibration_raw)
-      for params in raw["CalibrationInformation"]["InertialSensors"]:
-        Rot = params["Rt"]["Rotation"]
-        T = params["Rt"]["Translation"]
-
-      print('R',Rot)
-      print('T',T)
-      RT = np.hstack([np.reshape(Rot,(3,3)),np.reshape(T,(3,1))])
-      cam_pose = np.vstack([RT,[0,0,0,1]])
+      # Set first frame as world system
+      if iter == 1:
+        first_Depthmap = depth_im
+        first_Points3D = PointCloud(first_Depthmap, np.linalg.inv(cam_intr))
+        continue
+      elif iter == 2:
+        second_Depthmap = depth_im
+        second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
+        # ICP find Trans between neighboring frames
+        first_pose = ICP_point_to_point(first_Points3D, second_Points3D)
+        first_Points3D = second_Points3D
+        continue
+      else:
+        second_Depthmap = depth_im
+        second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
+        # ICP find Trans between neighboring frames
+        pose = ICP_point_to_point(first_Points3D, second_Points3D)
+        cam_pose = np.dot(first_pose, pose)
+        first_Points3D = second_Points3D
+        first_pose = cam_pose
 
       print('cam_pose', cam_pose)
-      김민수
+
+      cam_pose = np.loadtxt("data/frame-%06d.pose.txt" % (3))  # 4x4 rigid transformation matrix
+
 
 
       # Compute camera view frustum and extend convex hull
@@ -84,7 +109,7 @@ if __name__ == "__main__":
       # ======================================================================================================== #
       # Initialize voxel volume
       print("Initializing voxel volume...")
-      if iter == 1:
+      if iter == 3:
         tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.01)
       else:
         tsdf_vol.set_vol_bnds(vol_bnds)
@@ -92,17 +117,11 @@ if __name__ == "__main__":
       # Loop through RGB-D images and fuse them together
       print("Fusing frame")
 
-      # Read RGB-D image and camera pose
-      color_image = cv2.cvtColor(capture.color,cv2.COLOR_BGR2RGB)
-      depth_im =capture.depth.astype(float)
-      depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
-      depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
-
       # Integrate observation into voxel volume (assume color aligned with depth)
       tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
       print(f"==========={iter}==========")
 
-    if iter==100:
+    if iter==50:
       break
     key = cv2.waitKey(10)
     if key != -1:

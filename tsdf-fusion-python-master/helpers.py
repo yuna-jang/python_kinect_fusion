@@ -33,5 +33,5 @@ def colorize(
     else:
         img = image.copy()
     img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-    img = cv2.applyColorMap(img, colormap)
+    # img = cv2.applyColorMap(img, colormap)
     return img
