@@ -5,6 +5,7 @@ import time
 
 import cv2
 import numpy as np
+np.set_printoptions(threshold=np.inf)
 
 import fusion
 
@@ -53,13 +54,20 @@ if __name__ == "__main__":
     capture = k4a.get_capture()
     if capture.depth is not None:
       iter = iter + 1
-      # Read depth image and camera pose
-      cv2.imshow("Depth", colorize(capture.depth, (None, 5000)))
-      cv2.imshow("Color", capture.transformed_color)
 
-      depth_im = capture.depth.astype(float)
+      # Read depth and color image
+      depth_im = capture.transformed_depth.astype(float)
       depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
       depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
+      color_image = cv2.cvtColor(capture.color,cv2.COLOR_BGR2RGB)
+
+      # Show
+      cv2.imshow("Depth", colorize(capture.transformed_depth, (None, 5000)))
+      cv2.imshow("Color", capture.color)
+      cv2.imwrite(rf"D:\2021\Yonsei\Research\python_kinect_fusion\tsdf-fusion-python-master\image_step\{iter}_color.jpg",capture.color)
+      cv2.imwrite(rf"D:\2021\Yonsei\Research\python_kinect_fusion\tsdf-fusion-python-master\image_step\{iter}_depth.jpg",colorize(capture.transformed_depth, (None, 5000)))
+      print(colorize(capture.depth, (None, 5000)))
+
 
       # KinectFusion에서 pose estimation하는 것을 참고하여 연산
 
@@ -106,17 +114,11 @@ if __name__ == "__main__":
       # Loop through RGB-D images and fuse them together
       print("Fusing frame")
 
-      # Read RGB-D image and camera pose
-      color_image = cv2.cvtColor(capture.transformed_color,cv2.COLOR_BGR2RGB)
-      depth_im =capture.depth.astype(float)
-      depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
-      depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
-
       # Integrate observation into voxel volume (assume color aligned with depth)
       tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
       print(f"==========={iter}==========")
 
-    if iter==100:
+    if iter==50:
       break
     key = cv2.waitKey(10)
     if key != -1:
