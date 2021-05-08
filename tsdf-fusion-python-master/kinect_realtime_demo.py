@@ -13,6 +13,7 @@ import fusion
 import pyk4a
 from helpers import colorize
 from pyk4a import Config, PyK4A
+from pyk4a import PyK4APlayback
 
 from icp_modules.ICP import ICP_point_to_point
 from icp_modules.FramePreprocessing import DepthMap,PointCloud
@@ -23,7 +24,6 @@ if __name__ == "__main__":
   # in world coordinates of the convex hull of all camera view
   # frustums in the dataset
   # ======================================================================================================== #
-  print("Estimating voxel volume bounds...")
 
   ## Open kinect camera by realtime
   k4a = PyK4A(
@@ -32,13 +32,20 @@ if __name__ == "__main__":
       depth_mode=pyk4a.DepthMode.NFOV_UNBINNED,
     )
   )
-  k4a.start()
+  if k4a.is_running == True:
+    k4a.start()
+  else:
+    filename = r'0_sample_video\fixed1.mkv'
+    k4a = PyK4APlayback(filename)
+    k4a.open()
+
 
   ## Load Kinect's intrinsic parameter
   intrinsic_color = k4a.calibration.get_camera_matrix(pyk4a.calibration.CalibrationType.COLOR)
   intrinsic_depth = k4a.calibration.get_camera_matrix(pyk4a.calibration.CalibrationType.DEPTH)
   distortion = k4a.calibration.get_distortion_coefficients(pyk4a.calibration.CalibrationType.COLOR)
   cam_intr = intrinsic_color
+  print(cam_intr)
 
   # vol_bnds 생성
   vol_bnds = np.zeros((3, 2))
@@ -51,9 +58,13 @@ if __name__ == "__main__":
     # in world coordinates of the convex hull of all camera view
     # frustums in the dataset
     # ======================================================================================================== #
-    capture = k4a.get_capture()
-    if capture.depth is not None:
+    try:
+      capture = k4a.get_capture()
+    except:
+        capture = k4a.get_next_capture()
+    if capture.depth is not None and capture.color is not None:
       iter = iter + 1
+      print(f"==========={iter}==========")
 
       # Read depth and color image
       depth_im = capture.transformed_depth.astype(float)
@@ -62,14 +73,9 @@ if __name__ == "__main__":
       color_image = cv2.cvtColor(capture.color,cv2.COLOR_BGR2RGB)
 
       # Show
-      cv2.imshow("Depth", colorize(capture.transformed_depth, (None, 5000)))
-      cv2.imshow("Color", capture.color)
-      cv2.imwrite(rf"D:\2021\Yonsei\Research\python_kinect_fusion\tsdf-fusion-python-master\image_step\{iter}_color.jpg",capture.color)
-      cv2.imwrite(rf"D:\2021\Yonsei\Research\python_kinect_fusion\tsdf-fusion-python-master\image_step\{iter}_depth.jpg",colorize(capture.transformed_depth, (None, 5000)))
-      print(colorize(capture.depth, (None, 5000)))
+      # cv2.imshow("Depth", colorize(capture.transformed_depth, (None, 5000)))
+      # cv2.imshow("Color", capture.color)
 
-
-      # KinectFusion에서 pose estimation하는 것을 참고하여 연산
 
       # Set first frame as world system
       if iter == 1:
@@ -79,24 +85,20 @@ if __name__ == "__main__":
       elif iter == 2:
         second_Depthmap = depth_im
         second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
-        # ICP find Trans between neighboring frames
         first_pose = ICP_point_to_point(first_Points3D, second_Points3D)
+        cam_pose = first_pose
         first_Points3D = second_Points3D
-        continue
       else:
         second_Depthmap = depth_im
         second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
-        # ICP find Trans between neighboring frames
         pose = ICP_point_to_point(first_Points3D, second_Points3D)
-        cam_pose = np.dot(first_pose, pose)
+        cam_pose = pose
+        # cam_pose = np.dot(first_pose, pose)
+        cam_pose = np.dot(pose, first_pose)
         first_Points3D = second_Points3D
         first_pose = cam_pose
 
-      print('cam_pose', cam_pose)
-
-      cam_pose = np.loadtxt("data/frame-%06d.pose.txt" % (3))  # 4x4 rigid transformation matrix
-
-
+      print('cam_pose\n', cam_pose)
 
       # Compute camera view frustum and extend convex hull
       view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, cam_pose)
@@ -109,7 +111,7 @@ if __name__ == "__main__":
       # ======================================================================================================== #
       # Initialize voxel volume
       print("Initializing voxel volume...")
-      if iter == 3:
+      if iter == 2:
         tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.01)
       else:
         tsdf_vol.set_vol_bnds(vol_bnds)
@@ -119,16 +121,18 @@ if __name__ == "__main__":
 
       # Integrate observation into voxel volume (assume color aligned with depth)
       tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
-      print(f"==========={iter}==========")
 
-    if iter==50:
+    if iter==4:
       break
     key = cv2.waitKey(10)
     if key != -1:
       cv2.destroyAllWindows()
       break
 
-  k4a.stop()
+  try:
+    k4a.stop()
+  except:
+    k4a.close()
 
   fps = iter / (time.time() - t0_elapse)
   print("Average FPS: {:.2f}".format(fps))

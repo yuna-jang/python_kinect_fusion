@@ -16,17 +16,16 @@ def FindRigidTransform(points_set_P, points_set_Q):
     # mass center transform
     X = points_set_P - P
     Y = points_set_Q - Q
-    M = X.dot(Y.T)
+    M = np.dot(X, Y.T)
 
     U, Sigma, Vt = np.linalg.svd(M)
     R = np.dot(Vt.T, U.T)
     t = Q - R.dot(P)
     trans = np.hstack((R, t))
-    print('Trans', trans)
     return trans
     pass
 
-def FindMatchingPairs(points_set_P,points_set_Q,pose, thresh=20):
+def FindMatchingPairs(points_set_P,points_set_Q,pose, thresh=0.05):
     """
     :param points_set_P: 3D points cloud, ndarray 3*N
     :param points_set_Q: 3D points cloud, ndarray 3*N
@@ -35,12 +34,11 @@ def FindMatchingPairs(points_set_P,points_set_Q,pose, thresh=20):
     :return: matching pairs index -> ind_P,ind_Q
     """
     P = np.vstack((points_set_P, np.ones((1, points_set_P.shape[1]))))
-    print()
     P_projection = pose.dot(P)
-    kdt = KDTree(points_set_Q, metric='euclidean')
-    dist, ind = kdt.query(P_projection, k=1, return_distance=True)
-    print('dist')
-    print(dist)
+    kdt = KDTree(points_set_Q.T, metric='euclidean')
+    dist, ind = kdt.query(P_projection.T, k=1, return_distance=True)
+    # print('dist')
+    # print(dist)
     ind_P = []
     ind_Q = []
     mean_error = 0
@@ -62,7 +60,7 @@ def ICP_point_to_point(points_set_P, points_set_Q):
     """
     iter_times = 20
     pose = FindRigidTransform(points_set_P, points_set_Q)
-    ind_P,ind_Q = FindMatchingPairs(points_set_P, points_set_Q, pose)
+    ind_P, ind_Q = FindMatchingPairs(points_set_P, points_set_Q, pose)
     matching_num = len(ind_P)
     print('First matching num',matching_num)
     for i in range(iter_times):
@@ -71,14 +69,14 @@ def ICP_point_to_point(points_set_P, points_set_Q):
         temp_pose = FindRigidTransform(temp_P, temp_Q)
         temp_ind_P, temp_ind_Q = FindMatchingPairs(points_set_P, points_set_Q, pose)
         temp_matching_num = len(temp_ind_P)
-        if temp_matching_num > matching_num:
+        if temp_matching_num >= matching_num:
             pose = temp_pose
             ind_P = temp_ind_P
             ind_Q = temp_ind_Q
             matching_num = temp_matching_num
         else:
             break
-    print('pose',pose)
+    # print('pose',pose)
     return np.vstack((pose, np.array([0,0,0,1])))
     pass
 
