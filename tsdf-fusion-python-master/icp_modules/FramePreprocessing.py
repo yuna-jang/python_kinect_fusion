@@ -18,7 +18,7 @@ def PointCloud(depth,Inverse):
     h, w = depth.shape
     num = h*w
     v_ind, u_ind = np.nonzero(depth)
-    samples = random.sample(range(len(v_ind)), 3000)
+    samples = random.sample(range(len(v_ind)), 10000)
     v_samples = v_ind[samples]
     u_samples = u_ind[samples]
     print('u_samples shape', u_samples.shape)

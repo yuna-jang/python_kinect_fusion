@@ -61,7 +61,7 @@ def FindMatchingPairs(points_set_P,points_set_Q,pose, thresh=0.01):
     pass
 
 
-def nearest_neighbor(points_set_P,points_set_Q,pose, thresh=0.05):
+def nearest_neighbor(points_set_P,points_set_Q,pose, thresh=0.01):
     '''
     Find the nearest (Euclidean) neighbor in dst for each point in src
     Input:
@@ -124,7 +124,7 @@ def ICP_point_to_point(points_set_P, points_set_Q):
     temp_P = np.vstack((temp_P, np.ones((1, temp_Q.shape[1]))))
     temp_P_trans = pose.dot(temp_P)
     ax.scatter(temp_Q[0, :], temp_Q[1, :], temp_Q[2, :], c='g', s=0.3)
-    ax.scatter(temp_P[0, :], temp_P[1, :], temp_P[2, :], c='b', s=0.3)
+    # ax.scatter(temp_P[0, :], temp_P[1, :], temp_P[2, :], c='b', s=0.3)
     ax.scatter(temp_P_trans[0, :], temp_P_trans[1, :], temp_P_trans[2, :], c='r', s=0.3)
     plt.show()
 
