@@ -38,7 +38,7 @@ if __name__ == "__main__":
   if k4a.is_running == True:
     k4a.start()
   else:
-    filename = r'0_sample_video\sample2.mkv'
+    filename = r'0_sample_video\moving2.mkv'
     k4a = PyK4APlayback(filename)
     k4a.open()
 
@@ -66,8 +66,8 @@ if __name__ == "__main__":
 
       # Read depth and color image
       depth_im = capture.transformed_depth.astype(float)
-      depth_im /= 10000.  ## depth is saved in 16-bit PNG in millimeters
-      depth_im[depth_im == 6.5535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
+      depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
+      depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
       color_image = convert_to_bgra_if_required(k4a.configuration["color_format"], capture.color)
 
       # Show
@@ -105,7 +105,7 @@ if __name__ == "__main__":
       # Initialize voxel volume
       if iter == 1:
         print("Initializing voxel volume...")
-        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.002)
+        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.005)
       else:
         tsdf_vol.set_vol_bnds(vol_bnds)
 
