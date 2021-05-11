@@ -18,10 +18,9 @@ def PointCloud(depth,Inverse):
     h, w = depth.shape
     num = h*w
     v_ind, u_ind = np.nonzero(depth)
-    samples = random.sample(range(len(v_ind)), 10000)
+    samples = random.sample(range(len(v_ind)), 5000)
     v_samples = v_ind[samples]
     u_samples = u_ind[samples]
-    print('u_samples shape', u_samples.shape)
     DepthMap = depth.reshape((1, num))
 
     depth_ind = []
@@ -31,11 +30,8 @@ def PointCloud(depth,Inverse):
         index = v*w+u
         depth_ind.append(index)
     DepthMap = DepthMap[:, depth_ind]
-    print('Depth shape', DepthMap.shape)
-    # Inverse = np.linalg.inv(camIn)
     uvdMap = np.vstack((u_samples, v_samples, DepthMap))
     Points = np.dot(Inverse, uvdMap)
-    print('check PointsCloud shape', Points.shape)
     return Points
     pass
 
