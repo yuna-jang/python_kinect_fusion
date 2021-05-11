@@ -17,7 +17,7 @@ from pyk4a import Config, PyK4A
 from pyk4a import PyK4APlayback
 
 from icp_modules.ICP import ICP_point_to_point
-from icp_modules.FramePreprocessing import DepthMap,PointCloud
+from icp_modules.FramePreprocessing import PointCloud
 
 
 if __name__ == "__main__":
@@ -75,7 +75,7 @@ if __name__ == "__main__":
       color_image = cv2.cvtColor(capture.color,cv2.COLOR_BGR2RGB)
 
       # Show
-      cv2.imshow("Depth", colorize(capture.transformed_depth, (None, 5000)))
+      # cv2.imshow("Depth", colorize(capture.transformed_depth, (None, 5000)))
       # cv2.imshow("Color", capture.color)
 
 
@@ -83,29 +83,18 @@ if __name__ == "__main__":
       if iter == 1:
         first_Depthmap = depth_im
         first_Points3D = PointCloud(first_Depthmap, np.linalg.inv(cam_intr))
-        # fig = plt.figure(figsize=(8, 8))
-        # ax = fig.add_subplot(111, projection='3d')
-        # ax.scatter(first_Points3D[0,:], first_Points3D[1,:], first_Points3D[2,:],c='b',s=0.1)
-        continue
-      elif iter == 2:
-        second_Depthmap = depth_im
-        second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
-        cam_pose = ICP_point_to_point(first_Points3D, second_Points3D)
-        first_Points3D = second_Points3D
+        cam_pose = np.eye(4)
         first_pose = cam_pose
-        # ax.scatter(first_Points3D[0, :], first_Points3D[1, :], first_Points3D[2, :], c='r',s=0.1)
-        # plt.show()
       else:
         second_Depthmap = depth_im
         second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
-        pose = ICP_point_to_point(first_Points3D, second_Points3D)
+        pose = ICP_point_to_point(second_Points3D, first_Points3D) # P->Q  // Q = pose.P
+        cam_pose = np.dot(first_pose, pose)
         cam_pose = pose
-        # cam_pose = np.dot(first_pose, pose)
-        cam_pose = np.dot(pose, first_pose)
         first_Points3D = second_Points3D
         first_pose = cam_pose
 
-      print('cam_pose\n', cam_pose)
+      # print('cam_pose\n', cam_pose)
 
       # Compute camera view frustum and extend convex hull
       view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, cam_pose)
@@ -118,10 +107,10 @@ if __name__ == "__main__":
       # ======================================================================================================== #
       # Initialize voxel volume
       print("Initializing voxel volume...")
-      if iter == 2:
+      if iter == 1:
         tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.01)
-      # else:
-      #   tsdf_vol.set_vol_bnds(vol_bnds)
+      else:
+        tsdf_vol.set_vol_bnds(vol_bnds)
 
       # Loop through RGB-D images and fuse them together
       print("Fusing frame")
@@ -129,7 +118,7 @@ if __name__ == "__main__":
       # Integrate observation into voxel volume (assume color aligned with depth)
       tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
 
-    if iter==6:
+    if iter==10:
       break
     key = cv2.waitKey(10)
     if key != -1:

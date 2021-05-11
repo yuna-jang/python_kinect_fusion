@@ -3,6 +3,7 @@
 
 import time
 
+import matplotlib.pyplot as plt
 import cv2
 import numpy as np
 
@@ -38,6 +39,9 @@ if __name__ == "__main__":
   print("Initializing voxel volume...")
   tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.02)
 
+  fig = plt.figure(figsize=(8, 8))
+  ax = fig.add_subplot(111, projection='3d')
+
 
   # Loop through RGB-D images and fuse them together
   t0_elapse = time.time()
@@ -50,10 +54,29 @@ if __name__ == "__main__":
     depth_im /= 1000.
     depth_im[depth_im == 65.535] = 0
     cam_pose = np.loadtxt("data/frame-%06d.pose.txt"%(i))
+    # if i >1:
+    #   cam_pose_prev = np.loadtxt("data/frame-%06d.pose.txt"%(i-1))
+    #
+    #
+    #   # cam_pose에서 3,4
+    #   #  1 1 1 1 col 곱
+    #   sub_cam_pose = cam_pose
+    #   sub_cam_pose_prev = cam_pose_prev
+    #   pose = sub_cam_pose.dot(sub_cam_pose_prev)
+    #
+    #   world_col_vec = np.array([1,1,1,1])
+    #   position = pose[0:3,:].dot(world_col_vec.T)
+    #
+    #   ax.scatter(position[0], position[1], position[2], c='g', s=0.3)
+    #
+    #   cam_pose = pose
+
 
     # Integrate observation into voxel volume (assume color aligned with depth)
     print(depth_im.shape)
     tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
+
+  # plt.show()
 
   fps = n_imgs / (time.time() - t0_elapse)
   print("Average FPS: {:.2f}".format(fps))
