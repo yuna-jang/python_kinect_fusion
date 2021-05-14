@@ -1,10 +1,10 @@
 import numpy as np
 from sklearn.neighbors import KDTree
-from sklearn.neighbors import NearestNeighbors
 import cv2
 import random
-import matplotlib.pyplot as plt
+from sklearn.neighbors import NearestNeighbors
 
+###
 def best_fit_transform(A, B):
     '''
     Calculates the least-squares best-fit transform that maps corresponding points A to B in m spatial dimensions
@@ -38,16 +38,18 @@ def best_fit_transform(A, B):
     if np.linalg.det(R) < 0:
        Vt[m-1,:] *= -1
        R = np.dot(Vt.T, U.T)
-
+    s = sum(b.T.dot(a) for a, b in zip(AA, BB)) / sum(a.T.dot(a) for a in AA)
     # translation
-    t = centroid_B.T - np.dot(R,centroid_A.T)
+    t = centroid_B.T - s * np.dot(R, centroid_A.T)
+    # translation
+    # t = centroid_B.T - np.dot(R,centroid_A.T)
 
     # homogeneous transformation
     T = np.identity(m+1)
     T[:m, :m] = R
     T[:m, m] = t
     # print('BestFitTransform')
-    return T, R, t
+    return T, R, t, s
 
 
 def nearest_neighbor(src, dst):
@@ -98,6 +100,10 @@ def icp(A, B, init_pose=None, max_iterations=20, tolerance=0.001):
     # A = np.squeeze(A)
     # B = np.squeeze(B)
     # get number of dimensions
+    # print('=======ICP=======')
+    # print(A.shape)
+    # print(B.shape)
+    # print('=================')
     m = A.shape[1]
     N = min(A.shape[0], B.shape[0])
     size = min(3000, A.shape[0], B.shape[0])
@@ -121,10 +127,13 @@ def icp(A, B, init_pose=None, max_iterations=20, tolerance=0.001):
         distances, indices = nearest_neighbor(src[:m, :].T, dst[:m,:].T)
 
         # compute the transformation between the current source and nearest destination points
-        T, _, _ = best_fit_transform(src[:m,:].T, dst[:m,indices].T)
+        # T, _, _ = best_fit_transform(src[:m,:].T, dst[:m,indices].T)
+        T, _, _, s = best_fit_transform(src[:m, :].T, dst[:m, indices].T)
 
         # update the current source
-        src = np.dot(T, src)
+        src = T.dot(src) * s
+        # # update the current source
+        # src = np.dot(T, src)
         # check error
         mean_error = np.mean(distances)
         if np.abs(prev_error - mean_error) < tolerance:
@@ -132,13 +141,58 @@ def icp(A, B, init_pose=None, max_iterations=20, tolerance=0.001):
         prev_error = mean_error
     # print('calculate final transformation')
     # calculate final transformation
-    T, _, _ = best_fit_transform(A[sampler, :], src[:m, :].T)
+    T, _, _, s = best_fit_transform(A[sampler, :], src[:m, :].T)
 
     return T, distances, i
 
 
+# def icp_select(A, B, init_pose=None, max_iterations=20, tolerance=0.001):
+#     assert A.shape == B.shape
+#     # get number of dimensions
+#     sample = 3000
+#
+#     # make points homogeneous, copy them to maintain the originals
+#     # for i in range(max_iterations):
+#     #     for j in range(batch_loop):
+#
+#     src = np.ones((m + 1, A.shape[0]))
+#     dst = np.ones((m + 1, B.shape[0]))
+#     src[:m, :] = np.copy(A.T)
+#     dst[:m, :] = np.copy(B.T)
+#
+#     # apply the initial pose estimation
+#     if init_pose is not None:
+#         src = np.dot(init_pose, src)
+#
+#     prev_error = 0
+#
+#     for i in range(max_iterations):
+#         print('ICP iteration: ', i)
+#         # find the nearest neighbors between the current source and destination points
+#         distances, indices = nearest_neighbor(src[:m, :].T, dst[:m, :].T)
+#
+#         # compute the transformation between the current source and nearest destination points
+#         T, _, _ = best_fit_transform(src[:m, :].T, dst[:m, indices].T)
+#
+#         # update the current source
+#         src = np.dot(T, src)
+#
+#         # check error
+#         mean_error = np.mean(distances)
+#         if np.abs(prev_error - mean_error) < tolerance:
+#             break
+#         prev_error = mean_error
+#
+#     # calculate final transformation
+#     T, _, _ = best_fit_transform(A, src[:m, :].T)
+#
+#     return T, distances, i
+
+
+###
 def ICP_point_to_plane():
     pass
+
 
 def FindRigidTransform(points_set_P, points_set_Q):
     """
@@ -151,17 +205,22 @@ def FindRigidTransform(points_set_P, points_set_Q):
     # mass center transform
     X = points_set_P - P
     Y = points_set_Q - Q
+    print(X.shape)
+    print(Y.shape)
     M = X.dot(Y.T)
-
+    # print(M.shape)
+    # M = X.dot(Y)
+    # print(M)
     U, Sigma, Vt = np.linalg.svd(M)
     R = np.dot(Vt.T, U.T)
     t = Q - R.dot(P)
     trans = np.hstack((R, t))
+    # print('Trans', trans)
     return trans
     pass
 
 
-def FindMatchingPairs(points_set_P,points_set_Q,pose, thresh=0.01):
+def FindMatchingPairs(points_set_P,points_set_Q,pose, thresh=20):
     """
     :param points_set_P: 3D points cloud, ndarray 3*N
     :param points_set_Q: 3D points cloud, ndarray 3*N
@@ -170,49 +229,26 @@ def FindMatchingPairs(points_set_P,points_set_Q,pose, thresh=0.01):
     :return: matching pairs index -> ind_P,ind_Q
     """
     P = np.vstack((points_set_P, np.ones((1, points_set_P.shape[1]))))
+    print()
     P_projection = pose.dot(P)
-    kdt = KDTree(points_set_Q.T, metric='euclidean')
-    dist, ind = kdt.query(P_projection.T, k=1, return_distance=True)
+    kdt = KDTree(points_set_Q, metric='euclidean')
+    dist, ind = kdt.query(P_projection, k=1, return_distance=True)
     # print('dist')
     # print(dist)
     ind_P = []
     ind_Q = []
-
     mean_error = 0
     for i in range(len(dist)):
-        if dist[i] < thresh:
-            ind_P.append(i)
-            ind_Q.append(ind[i][0])
-            mean_error += dist[i]
+        print(dist[i])
+        # if dist[i] < thresh:
+        ind_P.append(i)
+        ind_Q.append(ind[i][0])
+        mean_error += dist[i]
+    # mean_error /= len(ind_P)
+    print('ind_P', ind_P)
+    print('ind_Q', ind_Q)
     return ind_P, ind_Q
     pass
-
-
-def nearest_neighbor_2(points_set_P,points_set_Q,pose, thresh=0.01):
-    '''
-    Find the nearest (Euclidean) neighbor in dst for each point in src
-    Input:
-        src: Nxm array of points
-        dst: Nxm array of points
-    Output:
-        distances: Euclidean distances of the nearest neighbor
-        indices: dst indices of the nearest neighbor
-    '''
-    P = np.vstack((points_set_P, np.ones((1, points_set_P.shape[1]))))
-    P_projection = pose.dot(P)
-    neigh = NearestNeighbors(n_neighbors=1)
-    neigh.fit(points_set_Q.T) #dst
-    dist, ind = neigh.kneighbors(P_projection.T, return_distance=True) #src
-    ind_P = []
-    ind_Q = []
-    for i in range(len(dist)):
-        if dist[i] < thresh:
-            ind_P.append(i)
-            ind_Q.append(ind[i][0])
-    return ind_P, ind_Q
-    pass
-    # return dist.ravel(), ind.ravel()
-
 
 
 def ICP_point_to_point(points_set_P, points_set_Q):
@@ -224,16 +260,14 @@ def ICP_point_to_point(points_set_P, points_set_Q):
     """
     iter_times = 20
     pose = FindRigidTransform(points_set_P, points_set_Q)
-    # ind_P, ind_Q = FindMatchingPairs(points_set_P, points_set_Q, pose)
-    ind_P, ind_Q = nearest_neighbor_2(points_set_P, points_set_Q, pose)
+    ind_P, ind_Q = FindMatchingPairs(points_set_P, points_set_Q, pose)
     matching_num = len(ind_P)
-    print('First matching num',matching_num)
+    # print('First matching num',matching_num)
     for i in range(iter_times):
         temp_P = points_set_P[:,ind_P]
         temp_Q = points_set_Q[:,ind_Q]
         temp_pose = FindRigidTransform(temp_P, temp_Q)
-        # temp_ind_P, temp_ind_Q = FindMatchingPairs(points_set_P, points_set_Q, pose)
-        temp_ind_P, temp_ind_Q = nearest_neighbor_2(points_set_P, points_set_Q, pose)
+        temp_ind_P, temp_ind_Q = FindMatchingPairs(points_set_P, points_set_Q, pose)
         temp_matching_num = len(temp_ind_P)
         if temp_matching_num > matching_num:
             pose = temp_pose
@@ -242,28 +276,6 @@ def ICP_point_to_point(points_set_P, points_set_Q):
             matching_num = temp_matching_num
         else:
             break
-    # print('pose',pose)
-
-    fig = plt.figure(figsize=(8, 8))
-    ax = fig.add_subplot(111, projection='3d')
-
-    # 매칭포인트만 띄우기
-    # temp_P = np.vstack((temp_P, np.ones((1, temp_P.shape[1]))))
-    # temp_P_trans = pose.dot(temp_P)
-    # ax.scatter(temp_Q[0, :], temp_Q[1, :], temp_Q[2, :], c='g', s=0.3)
-    # # ax.scatter(temp_P[0, :], temp_P[1, :], temp_P[2, :], c='b', s=0.3)
-    # ax.scatter(temp_P_trans[0, :], temp_P_trans[1, :], temp_P_trans[2, :], c='r', s=0.3)
-
-    # 전체포인트 띄우기
-    points_set_P = np.vstack((points_set_P, np.ones((1, points_set_P.shape[1]))))
-    temp_P_trans = pose.dot(points_set_P)
-    ax.scatter(points_set_Q[0, :], points_set_Q[1, :], points_set_Q[2, :], c='g', s=0.3)
-    # ax.scatter(points_set_P[0, :], points_set_P[1, :], points_set_P[2, :], c='b', s=0.3)
-    ax.scatter(temp_P_trans[0, :], temp_P_trans[1, :], temp_P_trans[2, :], c='r', s=0.3)
-    plt.show()
-
+    # print('pose', pose)
     return np.vstack((pose, np.array([0,0,0,1])))
-    pass
-
-if __name__ == '__main__':
     pass
