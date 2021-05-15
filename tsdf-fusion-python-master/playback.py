@@ -93,7 +93,7 @@ def play3(playback: PyK4APlayback):
     img_list = []
     depth_list = []
     compare = []
-    while count <= 20:
+    while count <= 5:
         try:
             capture = playback.get_next_capture()
             if count == 0:
@@ -103,26 +103,24 @@ def play3(playback: PyK4APlayback):
             else:
                 prev_d = next_d.copy()
                 next_d = capture.depth_point_cloud.transpose(2, 0, 1).reshape(3, -1)
-
-
                 pose, distances, _ = icp(prev_d.T, next_d.T)
                 # print(pose)
                 if len(poses) == 0:
                     # key_pose = pose
-                    print(pose)
                     poses.append(pose)
                 else:
                     # print('btw pose', pose)
                     pose = poses[-1].dot(pose)
                     # print('global pose', pose)
                     poses.append(pose)
-                if count == 20:
-                    print(pose)
-                    print(np.vstack((next_d, np.ones((1, 262144)))).shape)
-                    compare.append(pose.dot(np.vstack((next_d, np.ones((1, 262144))))))
-                # depth_list.append(capture.transformed_depth.astype(float))
-                # img_list.append(convert_to_bgra_if_required(playback.configuration["color_format"],
-                #                                             capture.color))
+                # if count == 20:
+                #     print(pose)
+                #     print(np.vstack((next_d, np.ones((1, 262144)))).shape)
+                #     compare.append(pose.dot(np.vstack((next_d, np.ones((1, 262144))))))
+                depth_list.append(capture.transformed_depth.astype(float))
+                img_list.append(convert_to_bgra_if_required(playback.configuration["color_format"],
+                                                            capture.color))
+
             key = cv2.waitKey(10)
             if key != -1:
                 break
@@ -132,15 +130,15 @@ def play3(playback: PyK4APlayback):
     # visualize(pose, prev_d, next_d)
     # poses = np.array(poses)
     # print(poses.shape)
-    fig = plt.figure(figsize=(8, 8))
+    # fig = plt.figure(figsize=(8, 8))
     # ax = plt.axes(projection='3d')
-    ax = fig.add_subplot(1, 2, 1, projection='3d')
-    ax.scatter(compare[0][0, :], compare[0][1, :], compare[0][2, :], c='g', s=0.3)
-    ax.scatter(compare[1][0, :], compare[1][1, :], compare[1][2, :], c='r', s=0.3)
-    ax = fig.add_subplot(1, 2, 2, projection='3d')
-    ax.scatter(compare[0][0, :], compare[0][1, :], compare[0][2, :], c='g', s=0.3)
-    ax.scatter(next_d[0, :], next_d[1, :], next_d[2, :], c='r', s=0.3)
-    plt.show()
+    # ax = fig.add_subplot(1, 2, 1, projection='3d')
+    # ax.scatter(compare[0][0, :], compare[0][1, :], compare[0][2, :], c='g', s=0.3)
+    # ax.scatter(compare[1][0, :], compare[1][1, :], compare[1][2, :], c='r', s=0.3)
+    # ax = fig.add_subplot(1, 2, 2, projection='3d')
+    # ax.scatter(compare[0][0, :], compare[0][1, :], compare[0][2, :], c='g', s=0.3)
+    # ax.scatter(next_d[0, :], next_d[1, :], next_d[2, :], c='r', s=0.3)
+    # plt.show()
     cv2.destroyAllWindows()
     return img_list, depth_list, poses
 
@@ -160,13 +158,9 @@ def play_tsdf(color_imgs:list, depth_imgs:list, poses: list):
         depth_img = depth_imgs[i]
         depth_img = np.divide(depth_img, 1000)
         print('-----------  ', i, '  ------------')
-        print(depth_img.max(), depth_img.min())
         depth_img[depth_img == 65.535] = 0
         pose = poses[i]
-        print('Pose')
-        print(pose)
         view_frust_pts = fusion.get_view_frustum(depth_img, K_color, pose)
-        print(view_frust_pts)
         print('-------------------------------')
         vol_bnds[:, 0] = np.minimum(vol_bnds[:, 0], np.amin(view_frust_pts, axis=1))
         vol_bnds[:, 1] = np.maximum(vol_bnds[:, 1], np.amax(view_frust_pts, axis=1))
@@ -177,6 +171,7 @@ def play_tsdf(color_imgs:list, depth_imgs:list, poses: list):
         color_img = color_imgs[i]
         depth_img = depth_imgs[i]
         pose = poses[i]
+        print('----- ', i, ' -----', '...integrate...')
         tsdf_vol.integrate(color_img, depth_img, K_color, pose, obs_weight=1.)
 
     verts, faces, norms, colors = tsdf_vol.get_mesh()
@@ -234,12 +229,12 @@ def main() -> None:
     if offset != 0.0:
         playback.seek(int(offset * 1000000))
     # play(playback)
-    play3(playback)
-    # color_imgs, depth_imgs, poses = play3(playback)
-    # play_tsdf(color_imgs, depth_imgs, poses)
+    # play3(playback)
+    color_imgs, depth_imgs, poses = play3(playback)
+    play_tsdf(color_imgs, depth_imgs, poses)
     # data_save(poses, color_imgs=color_imgs, depth_imgs=depth_imgs,
     #        save_dir='C:\\Users\\82106\\PycharmProjects\\dino_lib\\azure\\custom_data')
-    # playback.close()
+    playback.close()
 
 
 if __name__ == "__main__":
