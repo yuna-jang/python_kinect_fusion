@@ -93,7 +93,7 @@ def play3(playback: PyK4APlayback):
     img_list = []
     depth_list = []
     compare = []
-    while count <= 20:
+    while count <= 200:
         try:
             capture = playback.get_next_capture()
             if count == 0:
@@ -132,16 +132,16 @@ def play3(playback: PyK4APlayback):
     # visualize(pose, prev_d, next_d)
     # poses = np.array(poses)
     # print(poses.shape)
-    fig = plt.figure(figsize=(8, 8))
-    # ax = plt.axes(projection='3d')
-    ax = fig.add_subplot(1, 2, 1, projection='3d')
-    ax.scatter(compare[0][0, :], compare[0][1, :], compare[0][2, :], c='g', s=0.3)
-    ax.scatter(compare[1][0, :], compare[1][1, :], compare[1][2, :], c='r', s=0.3)
-    ax = fig.add_subplot(1, 2, 2, projection='3d')
-    ax.scatter(compare[0][0, :], compare[0][1, :], compare[0][2, :], c='g', s=0.3)
-    ax.scatter(next_d[0, :], next_d[1, :], next_d[2, :], c='r', s=0.3)
-    plt.show()
-    cv2.destroyAllWindows()
+    # fig = plt.figure(figsize=(8, 8))
+    # # ax = plt.axes(projection='3d')
+    # ax = fig.add_subplot(1, 2, 1, projection='3d')
+    # ax.scatter(compare[0][0, :], compare[0][1, :], compare[0][2, :], c='g', s=0.3)
+    # ax.scatter(compare[1][0, :], compare[1][1, :], compare[1][2, :], c='r', s=0.3)
+    # ax = fig.add_subplot(1, 2, 2, projection='3d')
+    # ax.scatter(compare[0][0, :], compare[0][1, :], compare[0][2, :], c='g', s=0.3)
+    # ax.scatter(next_d[0, :], next_d[1, :], next_d[2, :], c='r', s=0.3)
+    # plt.show()
+    # cv2.destroyAllWindows()
     return img_list, depth_list, poses
 
 
@@ -224,6 +224,8 @@ def main() -> None:
     # filename: str = args.FILE
     # offset: float = args.seek
     filename = 'C:\\Users\\82106\\PycharmProjects\\dino_lib\\azure\\sample2.mkv'
+    filename = r'0_sample_video\sample2.mkv'
+
     offset = 0
 
     playback = PyK4APlayback(filename)
@@ -231,16 +233,15 @@ def main() -> None:
 
     info(playback)
 
-    if offset != 0.0:
-        playback.seek(int(offset * 1000000))
-    # play(playback)
+    # if offset != 0.0:
+    #     playback.seek(int(offset * 1000000))
+    play(playback)
     play3(playback)
-    # color_imgs, depth_imgs, poses = play3(playback)
-    # play_tsdf(color_imgs, depth_imgs, poses)
-    # data_save(poses, color_imgs=color_imgs, depth_imgs=depth_imgs,
-    #        save_dir='C:\\Users\\82106\\PycharmProjects\\dino_lib\\azure\\custom_data')
+    color_imgs, depth_imgs, poses = play3(playback)
+    play_tsdf(color_imgs, depth_imgs, poses)
+    data_save(poses, color_imgs=color_imgs, depth_imgs=depth_imgs,
+           save_dir='')
     # playback.close()
-
 
 if __name__ == "__main__":
     main()

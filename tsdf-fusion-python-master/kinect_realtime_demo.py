@@ -38,7 +38,7 @@ if __name__ == "__main__":
   if k4a.is_running == True:
     k4a.start()
   else:
-    filename = r'0_sample_video\fixed1.mkv'
+    filename = r'0_sample_video\moving2.mkv'
     k4a = PyK4APlayback(filename)
     k4a.open()
 
@@ -106,7 +106,7 @@ if __name__ == "__main__":
       # Initialize voxel volume
       if iter == 1:
         print("Initializing voxel volume...")
-        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.0018)
+        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.002)
       else:
         tsdf_vol.set_vol_bnds(vol_bnds)
 
@@ -116,7 +116,7 @@ if __name__ == "__main__":
       # Integrate observation into voxel volume (assume color aligned with depth)
       tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
 
-      if iter==200:
+      if iter==48:
           break
 
 
@@ -124,9 +124,6 @@ if __name__ == "__main__":
       if key != -1:
         cv2.destroyAllWindows()
         break
-
-    elif iter>2:
-      break
 
 
   try:
