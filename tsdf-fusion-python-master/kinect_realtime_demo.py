@@ -85,11 +85,12 @@ if __name__ == "__main__":
         second_Depthmap = depth_im
         second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
 
-        # pose, distances, _ = icp(second_Points3D.T, first_Points3D.T)
-        pose, distances, _ = icp(first_Points3D.T, second_Points3D.T)
+        pose, distances, _ = icp(second_Points3D.T, first_Points3D.T) # A, B // maps A onto B : B = pose*A
+        # pose, distances, _ = icp(first_Points3D.T, second_Points3D.T) # A, B // maps A onto B : B = pose*A
 
-        # cam_pose = np.dot(pose, first_pose)
-        # cam_pose = np.dot(first_pose,pose)
+        # pose = np.dot(pose, first_pose)
+        pose = np.dot(first_pose,pose)
+
 
         cam_pose = pose
         first_Points3D = second_Points3D
@@ -105,7 +106,7 @@ if __name__ == "__main__":
       # Initialize voxel volume
       if iter == 1:
         print("Initializing voxel volume...")
-        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.005)
+        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.002)
       else:
         tsdf_vol.set_vol_bnds(vol_bnds)
 
@@ -115,21 +116,23 @@ if __name__ == "__main__":
       # Integrate observation into voxel volume (assume color aligned with depth)
       tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
 
-    if iter==200:
-      break
+      if iter==48:
+          break
 
-    key = cv2.waitKey(10)
-    if key != -1:
-      cv2.destroyAllWindows()
-      break
+
+      key = cv2.waitKey(10)
+      if key != -1:
+        cv2.destroyAllWindows()
+        break
+
 
   try:
     k4a.stop()
   except:
     k4a.close()
 
-  fps = iter / (time.time() - t0_elapse)
-  print("Average FPS: {:.2f}".format(fps))
+  # fps = iter / (time.time() - t0_elapse)
+  # print("Average FPS: {:.2f}".format(fps))
 
   # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
   print("Saving mesh to test_mesh.ply...")
