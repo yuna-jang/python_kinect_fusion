@@ -91,6 +91,7 @@ if __name__ == "__main__":
         pose, distances, _ = icp(second_Points3D.T, first_Points3D.T) # A, B // maps A onto B : B = pose*A
         pose = np.dot(first_pose,pose)
 
+
         cam_pose = pose
         first_Points3D = second_Points3D
         first_pose = cam_pose
@@ -109,11 +110,13 @@ if __name__ == "__main__":
       # else:
         # tsdf_vol.set_vol_bnds(vol_bnds)
 
+
       # Loop through RGB-D images and fuse them together
       print("Fusing frame")
 
       # Integrate observation into voxel volume (assume color aligned with depth)
       tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
+
 
       if iter==200:
           break
@@ -125,13 +128,18 @@ if __name__ == "__main__":
         break
 
 
+    key = cv2.waitKey(10)
+    if key != -1:
+      cv2.destroyAllWindows()
+      break
+
   try:
     k4a.stop()
   except:
     k4a.close()
 
-  # fps = iter / (time.time() - t0_elapse)
-  # print("Average FPS: {:.2f}".format(fps))
+  fps = iter / (time.time() - t0_elapse)
+  print("Average FPS: {:.2f}".format(fps))
 
   # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
   print("Saving mesh to test_mesh.ply...")

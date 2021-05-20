@@ -55,7 +55,6 @@ if __name__ == "__main__":
     depth_im[depth_im == 65.535] = 0
     cam_pose = np.loadtxt("data/frame-%06d.pose.txt"%(i))
 
-
     # Integrate observation into voxel volume (assume color aligned with depth)
     print(depth_im.shape)
     tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
