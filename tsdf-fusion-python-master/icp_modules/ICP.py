@@ -73,7 +73,7 @@ def nearest_neighbor(src, dst):
 
 
 
-def icp(A, B, init_pose=None, max_iterations=20, tolerance=0.001):
+def icp(A, B, init_pose=None, max_iterations=20, tolerance=0.0000001):
     '''
     The Iterative Closest Point method: finds best-fit transform that maps points A on to points B
     Input:
