@@ -235,8 +235,8 @@ def main() -> None:
 
     # if offset != 0.0:
     #     playback.seek(int(offset * 1000000))
-    play(playback)
-    play3(playback)
+    # play(playback)
+    # play3(playback)
     color_imgs, depth_imgs, poses = play3(playback)
     play_tsdf(color_imgs, depth_imgs, poses)
     data_save(poses, color_imgs=color_imgs, depth_imgs=depth_imgs,
