@@ -229,8 +229,10 @@ def main() -> None:
     playback.open()
 
     info(playback)
-    if offset != 0.0:
-        playback.seek(int(offset * 1000000))
+
+    # if offset != 0.0:
+    #     playback.seek(int(offset * 1000000))
+
     # play(playback)
     # play3(playback)
     color_imgs, depth_imgs, poses = play3(playback)

@@ -1,6 +1,3 @@
-"""Fuse 1000 RGB-D images from the 7-scenes dataset into a TSDF voxel volume with 2cm resolution.
-"""
-
 import time
 
 import cv2
@@ -33,14 +30,17 @@ if __name__ == "__main__":
     Config(
       color_resolution=pyk4a.ColorResolution.RES_720P,
       depth_mode=pyk4a.DepthMode.NFOV_UNBINNED,
+      synchronized_images_only=True,
     )
   )
-  if k4a.is_running == True:
-    k4a.start()
-  else:
-    filename = r'0_sample_video\moving2.mkv'
+  try:
+     k4a.start()
+     print("키넥트 모드")
+  except:
+    filename = r'0_sample_video\sample2.mkv'
     k4a = PyK4APlayback(filename)
     k4a.open()
+    print("비디오 모드")
 
 
   ## Load Kinect's intrinsic parameter
@@ -68,11 +68,11 @@ if __name__ == "__main__":
       depth_im = capture.transformed_depth.astype(float)
       depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
       depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
-      color_image = convert_to_bgra_if_required(k4a.configuration["color_format"], capture.color)
+      color_image = cv2.cvtColor(capture.color, cv2.COLOR_BGR2RGB)
 
       # Show
-      # cv2.imshow("Depth", colorize(capture.transformed_depth, (None, 5000)))
-      # cv2.imshow("Color", color_image)
+      cv2.imshow("Depth", colorize(capture.transformed_depth, (None, 5000)))
+      cv2.imshow("Color", color_image)
 
 
       # Set first frame as world system
@@ -86,9 +86,6 @@ if __name__ == "__main__":
         second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
 
         pose, distances, _ = icp(second_Points3D.T, first_Points3D.T) # A, B // maps A onto B : B = pose*A
-        # pose, distances, _ = icp(first_Points3D.T, second_Points3D.T) # A, B // maps A onto B : B = pose*A
-
-        # pose = np.dot(pose, first_pose)
         pose = np.dot(first_pose,pose)
 
 
@@ -106,9 +103,10 @@ if __name__ == "__main__":
       # Initialize voxel volume
       if iter == 1:
         print("Initializing voxel volume...")
-        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.002)
-      else:
-        tsdf_vol.set_vol_bnds(vol_bnds)
+        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.01)
+      # else:
+        # tsdf_vol.set_vol_bnds(vol_bnds)
+
 
       # Loop through RGB-D images and fuse them together
       print("Fusing frame")
@@ -116,7 +114,8 @@ if __name__ == "__main__":
       # Integrate observation into voxel volume (assume color aligned with depth)
       tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
 
-      if iter==48:
+
+      if iter==200:
           break
 
 
@@ -126,18 +125,23 @@ if __name__ == "__main__":
         break
 
 
+    key = cv2.waitKey(10)
+    if key != -1:
+      cv2.destroyAllWindows()
+      break
+
   try:
     k4a.stop()
   except:
     k4a.close()
 
-  # fps = iter / (time.time() - t0_elapse)
-  # print("Average FPS: {:.2f}".format(fps))
+  fps = iter / (time.time() - t0_elapse)
+  print("Average FPS: {:.2f}".format(fps))
 
   # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
   print("Saving mesh to test_mesh.ply...")
   verts, faces, norms, colors = tsdf_vol.get_mesh()
-  fusion.meshwrite("test_mesh.ply", verts, faces, norms, colors)
+  fusion.meshwrite("test_mesh_sample.ply", verts, faces, norms, colors)
 
   # Get point cloud from voxel volume and save to disk (can be viewed with Meshlab)
   print("Saving point cloud to test_pcd.ply...")
