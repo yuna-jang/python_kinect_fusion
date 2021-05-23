@@ -37,7 +37,7 @@ if __name__ == "__main__":
      k4a.start()
      print("키넥트 모드")
   except:
-    filename = r'0_sample_video\sample2.mkv'
+    filename = r'0_sample_video\moving2.mkv'
     k4a = PyK4APlayback(filename)
     k4a.open()
     print("비디오 모드")
@@ -71,8 +71,8 @@ if __name__ == "__main__":
       color_image = cv2.cvtColor(capture.color, cv2.COLOR_BGR2RGB)
 
       # Show
-      cv2.imshow("Depth", colorize(capture.transformed_depth, (None, 5000)))
-      cv2.imshow("Color", color_image)
+      # cv2.imshow("Depth", colorize(capture.transformed_depth, (None, 5000)))
+      # cv2.imshow("Color", color_image)
 
 
       # Set first frame as world system
@@ -82,12 +82,14 @@ if __name__ == "__main__":
         cam_pose = np.eye(4)
         first_pose = cam_pose
       else:
-        second_Depthmap = depth_im
-        second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
+        # legacy
+        # second_Depthmap = depth_im
+        # second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
 
-        pose, distances, _ = icp(second_Points3D.T, first_Points3D.T) # A, B // maps A onto B : B = pose*A
+        second_Points3D = tsdf_vol.get_point_cloud()[0:first_Points3D.shape[1], 0:3]
+
+        pose, distances, _ = icp(second_Points3D.T, first_Points3D) # A, B // maps A onto B : B = pose*A
         pose = np.dot(first_pose,pose)
-
 
         cam_pose = pose
         first_Points3D = second_Points3D
@@ -104,8 +106,8 @@ if __name__ == "__main__":
       if iter == 1:
         print("Initializing voxel volume...")
         tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.01)
-      # else:
-        # tsdf_vol.set_vol_bnds(vol_bnds)
+      else:
+        tsdf_vol.set_vol_bnds(vol_bnds)
 
 
       # Loop through RGB-D images and fuse them together

@@ -26,7 +26,7 @@ if __name__ == "__main__":
   # frustums in the dataset
   # ======================================================================================================== #
   print("Estimating voxel volume bounds...")
-  n_imgs = 100
+  n_imgs = 50
   cam_intr = np.loadtxt("data/camera-intrinsics.txt", delimiter=' ')
   vol_bnds = np.zeros((3,2))
   for i in range(n_imgs):
@@ -55,8 +55,10 @@ if __name__ == "__main__":
 
   # Loop through RGB-D images and fuse them together
   t0_elapse = time.time()
+
   fig = plt.figure(figsize=(8, 8))
   ax = fig.add_subplot(111, projection='3d')
+
   for i in range(n_imgs):
     print("Fusing frame %d/%d"%(i+1, n_imgs))
 
@@ -70,23 +72,35 @@ if __name__ == "__main__":
     if i == 0:
       first_Depthmap = depth_im
       first_Points3D = PointCloud(first_Depthmap, np.linalg.inv(cam_intr))
-      cam_pose = np.matrix('9.093128999999999795e-01 2.726222899999999894e-01 -3.142243299999999961e-01 -3.404563400000000239e-01;'
-                           '-2.724861800000000223e-01 9.610497999999999541e-01 4.527962600000000337e-02 1.646981800000000065e-02;'
-                           '3.143392500000000145e-01 4.444964600000000238e-02 9.482093499999999509e-01 2.965691699999999931e-01;'
-                           '0.000000000000000000e+00 0.000000000000000000e+00 0.000000000000000000e+00 1.000000000000000000e+00')
+      cam_pose = np.eye(4)
       first_pose = cam_pose
     else:
-      # second_Depthmap = depth_im
-      # second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
-      second_Points3D = tsdf_vol.get_point_cloud()[0:first_Points3D.shape[1], 0:3]
+      second_Depthmap = depth_im
+      second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
+      first_Points3D = tsdf_vol.get_point_cloud()[:, 0:3]
 
-      pose, distances, _ = icp(second_Points3D, first_Points3D.T)  # A, B // maps A onto B : B = pose*A
+      # knn으로 n개 뽑기 nx3
+      # indices는 dst꺼
+      dist, indices = nearest_neighbor(second_Points3D.T, first_Points3D)
+      # dist, indices = nearest_neighbor(first_Points3D, second_Points3D.T)
+      zipped = zip(dist, indices)
+      zipped = list(zipped)
+      res = sorted(zipped, key=lambda x: x[1])
+      ind = []
+      for j in range(second_Points3D.shape[1]):
+        ind.append(res[j][1])
+
+      ax.scatter(second_Points3D[0, :], second_Points3D[1, :], second_Points3D[2, :], c='g', s=0.1)
+      ax.scatter(first_Points3D[ind,0],first_Points3D[ind,1], first_Points3D[ind,2], c='r', s=0.1)
+      plt.show()
+
+
+      pose, distances, _ = icp(second_Points3D.T, first_Points3D[ind,:])  # A, B // maps A onto B : B = pose*A
 
       pose = np.dot(first_pose, pose)
       print(f'frame{i} \n{pose}')
 
       cam_pose = pose
-      first_Points3D = second_Points3D.T
       first_pose = cam_pose
 
       # #icp 검증
