@@ -68,41 +68,54 @@ if __name__ == "__main__":
       first_Depthmap = depth_im
       first_Points3D = PointCloud(first_Depthmap, np.linalg.inv(cam_intr))
 
-      cam_pose = np.eye(4)
-      list_pose.append(cam_pose)
+      pose = np.eye(4)
+      list_pose.append(pose)
 
     elif i == 1:
       second_Depthmap = depth_im
       second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
       pose, distances, _ = icp(second_Points3D.T, first_Points3D.T) # A, B // maps A onto B : B = pose*A
       pose = np.dot(list_pose[i-1], pose)
+      list_pose.append(pose)
+      first_Points3D = second_Points3D
 
-      cam_pose = pose
-      list_pose.append(cam_pose)
+    elif i == 2:
+      second_Depthmap = depth_im
+      second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
+      pose, distances, _ = icp(second_Points3D.T, first_Points3D.T) # A, B // maps A onto B : B = pose*A
+      pose = np.dot(list_pose[i-1], pose)
+      list_pose.append(pose)
 
-    elif i > 1:
+    elif i > 2:
       second_Depthmap = depth_im
       second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
 
       # t-1, t-2 프레임들로 얻은 pointcloud로 icp하기
-      for j in [2, 1]:
+      for j in [3, 2, 1]:
         color_seq = cv2.cvtColor(cv2.imread("data/frame-%06d.color.jpg" % (iter-j)), cv2.COLOR_BGR2RGB)
         depth_seq = cv2.imread("data/frame-%06d.depth.png" % (iter-j), -1).astype(float)
         depth_seq /= 1000.  # depth is saved in 16-bit PNG in millimeters
         depth_seq[depth_seq == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset)
 
         # Read depth image and camera pose : t-2
-        if j == 2:
-          depth_seq_2 = depth_seq
-          points_2 = PointCloud(depth_seq_2, np.linalg.inv(cam_intr))
-          pose_2 = list_pose[i-2]
-          pose_seq = pose_2
+        if j == 3:
+          depth_seq_3 = depth_seq
+          points_3 = PointCloud(depth_seq_3, np.linalg.inv(cam_intr))
+          pose_3 = list_pose[i-3]
+          pose_seq = pose_3
 
           # Create TSDF volume
           view_frust_pts = fusion.get_view_frustum(depth_seq, cam_intr, pose_seq)
           vol_bnds[:, 0] = np.minimum(vol_bnds[:, 0], np.amin(view_frust_pts, axis=1))
           vol_bnds[:, 1] = np.maximum(vol_bnds[:, 1], np.amax(view_frust_pts, axis=1))
           tsdf_vol_seq = fusion.TSDFVolume(vol_bnds, voxel_size=0.02)
+
+        # Read depth image and camera pose : t-2
+        elif j == 2:
+          depth_seq_2 = depth_seq
+          points_2 = PointCloud(depth_seq_2, np.linalg.inv(cam_intr))
+          pose_2, distances, _ = icp(points_2.T, points_3.T)  # A, B // maps A onto B : B = pose*A
+          pose_seq = np.dot(pose_3, pose_2)
 
         # Read depth image and camera pose : t-1
         elif j == 1:

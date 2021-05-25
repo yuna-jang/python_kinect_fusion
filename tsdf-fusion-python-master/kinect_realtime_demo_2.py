@@ -1,13 +1,14 @@
+"""Fuse 1000 RGB-D images from the 7-scenes dataset into a TSDF voxel volume with 2cm resolution.
+"""
+
 import time
 
-import cv2
 import matplotlib.pyplot as plt
+import cv2
 import numpy as np
-np.set_printoptions(threshold=np.inf)
 
 import fusion
 
-# Kinect module
 import pyk4a
 from helpers import colorize
 from pyk4a import Config, PyK4A
@@ -24,129 +25,117 @@ if __name__ == "__main__":
   # in world coordinates of the convex hull of all camera view
   # frustums in the dataset
   # ======================================================================================================== #
+  print("Estimating voxel volume bounds...")
+  n_imgs = 50
+  cam_intr = np.loadtxt("data/camera-intrinsics.txt", delimiter=' ')
+  vol_bnds = np.zeros((3,2))
+  for i in range(n_imgs):
+    # Read depth image and camera pose
+    depth_im = cv2.imread("data/frame-%06d.depth.png"%(i),-1).astype(float)
+    depth_im /= 1000.  # depth is saved in 16-bit PNG in millimeters
+    depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset)
+    cam_pose = np.loadtxt("data/frame-%06d.pose.txt" % (i))  # 4x4 rigid transformation matrix
 
-  ## Open kinect camera by realtime
-  k4a = PyK4A(
-    Config(
-      color_resolution=pyk4a.ColorResolution.RES_720P,
-      depth_mode=pyk4a.DepthMode.NFOV_UNBINNED,
-      synchronized_images_only=True,
-    )
-  )
-  try:
-     k4a.start()
-     print("키넥트 모드")
-  except:
-    filename = r'0_sample_video\moving2.mkv'
-    k4a = PyK4APlayback(filename)
-    k4a.open()
-    print("비디오 모드")
+    # Compute camera view frustum and extend convex hull
+    view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, cam_pose)
+    vol_bnds[:,0] = np.minimum(vol_bnds[:,0], np.amin(view_frust_pts, axis=1))
+    vol_bnds[:,1] = np.maximum(vol_bnds[:,1], np.amax(view_frust_pts, axis=1))
+  # ======================================================================================================== #
 
+  # ======================================================================================================== #
+  # Integrate
+  # ======================================================================================================== #
+  # Initialize voxel volume
+  print("Initializing voxel volume...")
+  tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.03)
 
-  ## Load Kinect's intrinsic parameter
-  intrinsic_color = k4a.calibration.get_camera_matrix(pyk4a.calibration.CalibrationType.COLOR)
-  intrinsic_depth = k4a.calibration.get_camera_matrix(pyk4a.calibration.CalibrationType.DEPTH)
-  distortion = k4a.calibration.get_distortion_coefficients(pyk4a.calibration.CalibrationType.COLOR)
-  cam_intr = intrinsic_color
-  print(cam_intr)
-
-  # vol_bnds 생성
-  vol_bnds = np.zeros((3, 2))
-
-  t0_elapse = time.time() # for check fps
-  iter = 0
-  while True:
-    try:
-      capture = k4a.get_capture()
-    except:
-        capture = k4a.get_next_capture()
-
-    if capture.depth is not None and capture.color is not None:
-      iter = iter + 1
-      print(f"==========={iter}==========")
-
-      # Read depth and color image
-      depth_im = capture.transformed_depth.astype(float)
-      depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
-      depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
-      color_image = cv2.cvtColor(capture.color, cv2.COLOR_BGR2RGB)
-
-      # Show
-      # cv2.imshow("Depth", colorize(capture.transformed_depth, (None, 5000)))
-      # cv2.imshow("Color", color_image)
+  # Loop through RGB-D images and fuse them together
+  t0_elapse = time.time()
 
 
-      # Set first frame as world system
-      if iter == 1:
-        first_Depthmap = depth_im
-        first_Points3D = PointCloud(first_Depthmap, np.linalg.inv(cam_intr))
-        cam_pose = np.eye(4)
-        first_pose = cam_pose
-      else:
-        # legacy
-        # second_Depthmap = depth_im
-        # second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
+  for i in range(n_imgs):
+    print("Fusing frame %d/%d"%(i+1, n_imgs))
 
-        second_Points3D = tsdf_vol.get_point_cloud()[0:first_Points3D.shape[1], 0:3]
+    # Read RGB-D image and camera pose
+    color_image = cv2.cvtColor(cv2.imread("data/frame-%06d.color.jpg"%(i)), cv2.COLOR_BGR2RGB)
+    depth_im = cv2.imread("data/frame-%06d.depth.png"%(i),-1).astype(float)
+    depth_im /= 1000.
+    depth_im[depth_im == 65.535] = 0
 
-        pose, distances, _ = icp(second_Points3D.T, first_Points3D) # A, B // maps A onto B : B = pose*A
-        pose = np.dot(first_pose,pose)
+    # Set first frame as world system
+    if i == 0:
+      first_Depthmap = depth_im
+      first_Points3D = PointCloud(first_Depthmap, np.linalg.inv(cam_intr))
+      cam_pose = np.eye(4)
+      first_pose = cam_pose
+    elif i == 1:
+      second_Depthmap = depth_im
+      second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
+      pose, distances, _ = icp(second_Points3D.T, first_Points3D.T) # A, B // maps A onto B : B = pose*A
+      pose = np.dot(first_pose, pose)
+      cam_pose = pose
+      first_pose = cam_pose
 
-        cam_pose = pose
-        first_Points3D = second_Points3D
-        first_pose = cam_pose
+    elif i > 1:
+      second_Depthmap = depth_im
+      second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
 
-      # Compute camera view frustum and extend convex hull
-      view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, cam_pose)
-      vol_bnds[:, 0] = np.minimum(vol_bnds[:, 0], np.amin(view_frust_pts, axis=1))
-      vol_bnds[:, 1] = np.maximum(vol_bnds[:, 1], np.amax(view_frust_pts, axis=1))
+      # knn으로 n개 뽑기 nx3
+      first_Points3D = tsdf_vol.get_point_cloud()[:, 0:3]
+      # src의 개수만큼 dst의 indices를 리턴
+      neigh = NearestNeighbors(n_neighbors=1, algorithm='kd_tree')
+      # 이론상 이거
+      neigh.fit(first_Points3D)  # dst
+      distances, indices = neigh.kneighbors(second_Points3D.T, return_distance=True)  # src
 
-      # ======================================================================================================== #
-
-      # Initialize voxel volume
-      if iter == 1:
-        print("Initializing voxel volume...")
-        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.01)
-      else:
-        tsdf_vol.set_vol_bnds(vol_bnds)
-
-
-      # Loop through RGB-D images and fuse them together
-      print("Fusing frame")
-
-      # Integrate observation into voxel volume (assume color aligned with depth)
-      tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
+      # neigh.fit(second_Points3D.T) # dst
+      # distances, indices = neigh.kneighbors(first_Points3D, return_distance=True) # src
 
 
-      if iter==200:
-          break
+      zipped = zip(distances, indices)
+      zipped = list(zipped)
+      res = sorted(zipped, key=lambda x: np.mean(x[0]))
+      ind = []
+      num_points = second_Points3D.shape[1]
 
+      # num_points개가 안나옴
+      for j in range(0,len(res)):
+        for k in range(0, len(res[j][1])):
+          if not(res[j][1][k] in ind):
+            ind.append(res[j][1][k])
+            if(len(ind) == num_points):
+              break
 
-      key = cv2.waitKey(10)
-      if key != -1:
-        cv2.destroyAllWindows()
-        break
+      samples = random.sample(range(first_Points3D.shape[0]), num_points-len(ind))
+      ind_set = ind + samples
 
+      pose, distances, _ = icp(second_Points3D.T, first_Points3D[ind_set,:])  # A, B // maps A onto B : B = pose*A
+      pose = np.dot(first_pose, pose)
 
-    key = cv2.waitKey(10)
-    if key != -1:
-      cv2.destroyAllWindows()
-      break
+      # pose matrix 검증
+      fig = plt.figure(figsize=(8, 8))
+      ax = fig.add_subplot(projection='3d')  # Axe3D object
+      P = np.vstack((second_Points3D, np.ones((1, second_Points3D.shape[1])))) # projection
+      proj = pose.dot(P)
+      ax.scatter(P.T[:, 0], P.T[:, 1], P.T[:, 2], color='r', s=0.3)
+      ax.scatter(first_Points3D[:, 0], first_Points3D[:, 1], first_Points3D[:, 2], color='g', s=0.3)
+      plt.show()
 
-  try:
-    k4a.stop()
-  except:
-    k4a.close()
+      cam_pose = pose
+      first_pose = cam_pose
 
-  fps = iter / (time.time() - t0_elapse)
+    # Integrate observation into voxel volume (assume color aligned with depth)
+    tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
+
+  fps = n_imgs / (time.time() - t0_elapse)
   print("Average FPS: {:.2f}".format(fps))
 
   # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
-  print("Saving mesh to test_mesh.ply...")
+  print("Saving mesh to mesh.ply...")
   verts, faces, norms, colors = tsdf_vol.get_mesh()
-  fusion.meshwrite("test_mesh_sample.ply", verts, faces, norms, colors)
+  fusion.meshwrite("mesh.ply", verts, faces, norms, colors)
 
   # Get point cloud from voxel volume and save to disk (can be viewed with Meshlab)
-  print("Saving point cloud to test_pcd.ply...")
+  print("Saving point cloud to pc.ply...")
   point_cloud = tsdf_vol.get_point_cloud()
-  fusion.pcwrite("test_pcd.ply", point_cloud)
+  fusion.pcwrite("pc.ply", point_cloud)
