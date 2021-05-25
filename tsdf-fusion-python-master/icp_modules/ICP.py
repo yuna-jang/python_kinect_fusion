@@ -38,11 +38,11 @@ def best_fit_transform(A, B):
     if np.linalg.det(R) < 0:
        Vt[m-1,:] *= -1
        R = np.dot(Vt.T, U.T)
+    # translation
     s = sum(b.T.dot(a) for a, b in zip(AA, BB)) / sum(a.T.dot(a) for a in AA)
+    # t = centroid_B.T - s * np.dot(R, centroid_A.T)
     # translation
-    t = centroid_B.T - s * np.dot(R, centroid_A.T)
-    # translation
-    # t = centroid_B.T - np.dot(R,centroid_A.T)
+    t = centroid_B.T - np.dot(R,centroid_A.T)
 
     # homogeneous transformation
     T = np.identity(m+1)

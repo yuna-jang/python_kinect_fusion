@@ -26,7 +26,7 @@ if __name__ == "__main__":
   # frustums in the dataset
   # ======================================================================================================== #
   print("Estimating voxel volume bounds...")
-  n_imgs = 50
+  n_imgs = 10
   cam_intr = np.loadtxt("data/camera-intrinsics.txt", delimiter=' ')
   vol_bnds = np.zeros((3,2))
   for i in range(n_imgs):
@@ -65,6 +65,7 @@ if __name__ == "__main__":
     if i == 0:
       first_Depthmap = depth_im
       first_Points3D = PointCloud(first_Depthmap, np.linalg.inv(cam_intr))
+
       cam_pose = np.eye(4)
       first_pose = cam_pose
 
@@ -90,7 +91,8 @@ if __name__ == "__main__":
 
         # Read depth image and camera pose : t-2
         if j == 2:
-          points_2 = PointCloud(depth_seq, np.linalg.inv(cam_intr))
+          depth_seq_2 = depth_seq
+          points_2 = PointCloud(depth_seq_2, np.linalg.inv(cam_intr))
           pose_2 = np.eye(4)
           pose_seq = pose_2
 
@@ -102,14 +104,16 @@ if __name__ == "__main__":
 
         # Read depth image and camera pose : t-1
         elif j == 1:
-          points_1 = PointCloud(depth_seq, np.linalg.inv(cam_intr))
+          depth_seq_1 = depth_seq
+          points_1 = PointCloud(depth_seq_1, np.linalg.inv(cam_intr))
           pose_1, distances, _ = icp(points_1.T, points_2.T)  # A, B // maps A onto B : B = pose*A
           pose_seq = np.dot(pose_2, pose_1)
 
         tsdf_vol_seq.integrate(color_seq, depth_seq, cam_intr, pose_seq, obs_weight=1.)
       first_Points3D = tsdf_vol_seq.get_point_cloud()
 
-      pose, distances, _ = icp(second_Points3D.T, first_Points3D[0:second_Points3D.shape[1], 0:3]) # A, B // maps A onto B : B = pose*A
+      ind = random.sample(range(first_Points3D.shape[0]), second_Points3D.shape[1])
+      pose, distances, _ = icp(second_Points3D.T, first_Points3D[ind, 0:3]) # A, B // maps A onto B : B = pose*A
       pose = np.dot(first_pose, pose)
 
       cam_pose = pose
