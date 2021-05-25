@@ -26,7 +26,7 @@ if __name__ == "__main__":
   # frustums in the dataset
   # ======================================================================================================== #
   print("Estimating voxel volume bounds...")
-  n_imgs = 10
+  n_imgs = 80
   cam_intr = np.loadtxt("data/camera-intrinsics.txt", delimiter=' ')
   vol_bnds = np.zeros((3,2))
   for i in range(n_imgs):
@@ -112,8 +112,9 @@ if __name__ == "__main__":
         tsdf_vol_seq.integrate(color_seq, depth_seq, cam_intr, pose_seq, obs_weight=1.)
       first_Points3D = tsdf_vol_seq.get_point_cloud()
 
-      ind = random.sample(range(first_Points3D.shape[0]), second_Points3D.shape[1])
-      pose, distances, _ = icp(second_Points3D.T, first_Points3D[ind, 0:3]) # A, B // maps A onto B : B = pose*A
+      # ind = random.sample(range(first_Points3D.shape[0]), second_Points3D.shape[1])
+      # pose, distances, _ = icp(second_Points3D.T, first_Points3D[ind, 0:3]) # A, B // maps A onto B : B = pose*A
+      pose, distances, _ = icp(second_Points3D.T, first_Points3D[0:second_Points3D.shape[1], 0:3]) # A, B // maps A onto B : B = pose*A
       pose = np.dot(first_pose, pose)
 
       cam_pose = pose
