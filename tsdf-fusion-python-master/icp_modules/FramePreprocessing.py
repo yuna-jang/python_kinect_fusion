@@ -18,8 +18,7 @@ def PointCloud(depth,Inverse):
     h, w = depth.shape
     num = h*w
     v_ind, u_ind = np.nonzero(depth)
-
-    samples = random.sample(range(len(v_ind)), 10000)
+    samples = random.sample(range(len(v_ind)), int(len(v_ind)*0.8))
     v_samples = v_ind[samples]
     u_samples = u_ind[samples]
     DepthMap = depth.reshape((1, num))
@@ -35,6 +34,7 @@ def PointCloud(depth,Inverse):
     Points = np.dot(Inverse, uvdMap)
     return Points
     pass
+
 
 def NormalMap(Points,h,w):
     # 越界的法向量被设置成了(0,0,0),可能需要处理
@@ -64,5 +64,3 @@ def NormalMap(Points,h,w):
 if __name__ == '__main__':
     Points = np.zeros((3, 800))
     norm = NormalMap(Points, 20, 40)
-
-

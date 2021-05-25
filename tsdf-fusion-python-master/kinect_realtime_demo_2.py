@@ -141,7 +141,6 @@ if __name__ == "__main__":
       # pose, distances, _ = icp(second_Points3D.T, first_Points3D[ind,:])  # A, B // maps A onto B : B = pose*A
 
 
-
       pose = np.dot(first_pose, pose)
       print(f'frame{i} \n{pose}')
 

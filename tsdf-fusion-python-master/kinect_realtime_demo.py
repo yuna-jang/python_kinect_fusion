@@ -1,6 +1,3 @@
-"""Fuse 1000 RGB-D images from the 7-scenes dataset into a TSDF voxel volume with 2cm resolution.
-"""
-
 import time
 
 import cv2
