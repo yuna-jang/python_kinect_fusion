@@ -47,7 +47,7 @@ if __name__ == "__main__":
   # ======================================================================================================== #
   # Initialize voxel volume
   print("Initializing voxel volume...")
-  tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.02)
+  tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.01)
 
   # Loop through RGB-D images and fuse them together
   t0_elapse = time.time()
@@ -112,18 +112,30 @@ if __name__ == "__main__":
         tsdf_vol_seq.integrate(color_seq, depth_seq, cam_intr, pose_seq, obs_weight=1.)
       first_Points3D = tsdf_vol_seq.get_point_cloud()
 
-      # ind = random.sample(range(first_Points3D.shape[0]), second_Points3D.shape[1])
+      # step_size = int(first_Points3D.shape[0]/second_Points3D.shape[1])
+      # ind = (range(0,first_Points3D.shape[0],step_size))[0:second_Points3D.shape[1]]
       # pose, distances, _ = icp(second_Points3D.T, first_Points3D[ind, 0:3]) # A, B // maps A onto B : B = pose*A
+
       pose, distances, _ = icp(second_Points3D.T, first_Points3D[0:second_Points3D.shape[1], 0:3]) # A, B // maps A onto B : B = pose*A
+
+      # pose, distances, _ = icp(second_Points3D.T, first_Points3D[-second_Points3D.shape[1] - 1:-1, 0:3]) # A, B // maps A onto B : B = pose*A
       pose = np.dot(first_pose, pose)
+
+      # Error check
+      # err=np.linalg.norm(pose-first_pose)
+      # if (err > 2.0):
+      #   print(f'Error in frame {i+1} : {err}')
+      #   pose, distances, _ = icp(second_Points3D.T,first_Points3D[10000:10000+second_Points3D.shape[1], 0:3])  # A, B // maps A onto B : B = pose*A
+      #   pose = np.dot(first_pose, pose)
+      #   err = np.linalg.norm(pose - first_pose)
+      #   print(f'Error correct {i+1} : {err}')
 
       cam_pose = pose
       first_pose = cam_pose
 
     # Integrate observation into voxel volume (assume color aligned with depth)
     tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
-    print(f'frame{i+1} \n{cam_pose}')
-
+    # print(f'frame{i+1} \n{cam_pose}')
 
   fps = n_imgs / (time.time() - t0_elapse)
   print("Average FPS: {:.2f}".format(fps))
