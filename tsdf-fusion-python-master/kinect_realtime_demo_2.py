@@ -90,9 +90,9 @@ if __name__ == "__main__":
       for j in range(second_Points3D.shape[1]):
         ind.append(res[j][1])
 
-      ax.scatter(second_Points3D[0, :], second_Points3D[1, :], second_Points3D[2, :], c='g', s=0.1)
-      ax.scatter(first_Points3D[ind,0],first_Points3D[ind,1], first_Points3D[ind,2], c='r', s=0.1)
-      plt.show()
+      # ax.scatter(second_Points3D[0, :], second_Points3D[1, :], second_Points3D[2, :], c='g', s=0.1)
+      # ax.scatter(first_Points3D[ind,0],first_Points3D[ind,1], first_Points3D[ind,2], c='r', s=0.1)
+      # plt.show()
 
 
       pose, distances, _ = icp(second_Points3D.T, first_Points3D[ind,:])  # A, B // maps A onto B : B = pose*A

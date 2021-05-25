@@ -107,7 +107,7 @@ def icp(A, B, init_pose=None, max_iterations=20, tolerance=0.001):
     # print('=================')
     m = A.shape[1]
     N = min(A.shape[0], B.shape[0])
-    size = min(10000, A.shape[0], B.shape[0])
+    size = min(A.shape[0], B.shape[0])
     sampler = random.sample(range(N), size)
 
     # make points homogeneous, copy them to maintain the originals
