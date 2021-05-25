@@ -26,10 +26,11 @@ if __name__ == "__main__":
   # frustums in the dataset
   # ======================================================================================================== #
   print("Estimating voxel volume bounds...")
-  n_imgs = 80
+  n_imgs_begin = 800
+  n_imgs_end = 850
   cam_intr = np.loadtxt("data/camera-intrinsics.txt", delimiter=' ')
   vol_bnds = np.zeros((3,2))
-  for i in range(n_imgs):
+  for i in range(n_imgs_begin, n_imgs_end):
     # Read depth image and camera pose
     depth_im = cv2.imread("data/frame-%06d.depth.png"%(i),-1).astype(float)
     depth_im /= 1000.  # depth is saved in 16-bit PNG in millimeters
@@ -52,12 +53,13 @@ if __name__ == "__main__":
   # Loop through RGB-D images and fuse them together
   t0_elapse = time.time()
 
-  for i in range(n_imgs):
-    print("Fusing frame %d/%d"%(i+1, n_imgs))
-
+  list_pose = []
+  i=0
+  for iter in range(n_imgs_begin, n_imgs_end):
+    print("Fusing frame %d/%d"%(i+1, n_imgs_end-n_imgs_begin))
     # Read RGB-D image and camera pose
-    color_image = cv2.cvtColor(cv2.imread("data/frame-%06d.color.jpg"%(i)), cv2.COLOR_BGR2RGB)
-    depth_im = cv2.imread("data/frame-%06d.depth.png"%(i),-1).astype(float)
+    color_image = cv2.cvtColor(cv2.imread("data/frame-%06d.color.jpg"%(iter)), cv2.COLOR_BGR2RGB)
+    depth_im = cv2.imread("data/frame-%06d.depth.png"%(iter),-1).astype(float)
     depth_im /= 1000.
     depth_im[depth_im == 65.535] = 0
 
@@ -67,16 +69,16 @@ if __name__ == "__main__":
       first_Points3D = PointCloud(first_Depthmap, np.linalg.inv(cam_intr))
 
       cam_pose = np.eye(4)
-      first_pose = cam_pose
+      list_pose.append(cam_pose)
 
     elif i == 1:
       second_Depthmap = depth_im
       second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
       pose, distances, _ = icp(second_Points3D.T, first_Points3D.T) # A, B // maps A onto B : B = pose*A
-      pose = np.dot(first_pose, pose)
+      pose = np.dot(list_pose[i-1], pose)
 
       cam_pose = pose
-      first_pose = cam_pose
+      list_pose.append(cam_pose)
 
     elif i > 1:
       second_Depthmap = depth_im
@@ -84,8 +86,8 @@ if __name__ == "__main__":
 
       # t-1, t-2 프레임들로 얻은 pointcloud로 icp하기
       for j in [2, 1]:
-        color_seq = cv2.cvtColor(cv2.imread("data/frame-%06d.color.jpg" % (i-j)), cv2.COLOR_BGR2RGB)
-        depth_seq = cv2.imread("data/frame-%06d.depth.png" % (i-j), -1).astype(float)
+        color_seq = cv2.cvtColor(cv2.imread("data/frame-%06d.color.jpg" % (iter-j)), cv2.COLOR_BGR2RGB)
+        depth_seq = cv2.imread("data/frame-%06d.depth.png" % (iter-j), -1).astype(float)
         depth_seq /= 1000.  # depth is saved in 16-bit PNG in millimeters
         depth_seq[depth_seq == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset)
 
@@ -93,7 +95,7 @@ if __name__ == "__main__":
         if j == 2:
           depth_seq_2 = depth_seq
           points_2 = PointCloud(depth_seq_2, np.linalg.inv(cam_intr))
-          pose_2 = np.eye(4)
+          pose_2 = list_pose[i-2]
           pose_seq = pose_2
 
           # Create TSDF volume
@@ -112,32 +114,18 @@ if __name__ == "__main__":
         tsdf_vol_seq.integrate(color_seq, depth_seq, cam_intr, pose_seq, obs_weight=1.)
       first_Points3D = tsdf_vol_seq.get_point_cloud()
 
-      # step_size = int(first_Points3D.shape[0]/second_Points3D.shape[1])
-      # ind = (range(0,first_Points3D.shape[0],step_size))[0:second_Points3D.shape[1]]
-      # pose, distances, _ = icp(second_Points3D.T, first_Points3D[ind, 0:3]) # A, B // maps A onto B : B = pose*A
-
       pose, distances, _ = icp(second_Points3D.T, first_Points3D[0:second_Points3D.shape[1], 0:3]) # A, B // maps A onto B : B = pose*A
-
-      # pose, distances, _ = icp(second_Points3D.T, first_Points3D[-second_Points3D.shape[1] - 1:-1, 0:3]) # A, B // maps A onto B : B = pose*A
-      pose = np.dot(first_pose, pose)
-
-      # Error check
-      # err=np.linalg.norm(pose-first_pose)
-      # if (err > 2.0):
-      #   print(f'Error in frame {i+1} : {err}')
-      #   pose, distances, _ = icp(second_Points3D.T,first_Points3D[10000:10000+second_Points3D.shape[1], 0:3])  # A, B // maps A onto B : B = pose*A
-      #   pose = np.dot(first_pose, pose)
-      #   err = np.linalg.norm(pose - first_pose)
-      #   print(f'Error correct {i+1} : {err}')
+      pose = np.dot(list_pose[i-1], pose)
 
       cam_pose = pose
-      first_pose = cam_pose
+      list_pose.append(cam_pose)
 
     # Integrate observation into voxel volume (assume color aligned with depth)
-    tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
-    # print(f'frame{i+1} \n{cam_pose}')
+    tsdf_vol.integrate(color_image, depth_im, cam_intr, list_pose[i], obs_weight=1.)
+    print(f'frame{i+1} \n{list_pose[i]}')
+    i=i+1
 
-  fps = n_imgs / (time.time() - t0_elapse)
+  fps = (n_imgs_end-n_imgs_begin) / (time.time() - t0_elapse)
   print("Average FPS: {:.2f}".format(fps))
 
   # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
