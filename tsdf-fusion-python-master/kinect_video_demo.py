@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
   # Load video file
   filename = r'0_sample_video\video1.mkv'
-  n_frames = 50
+  n_frames = 20
   k4a = PyK4APlayback(filename)
   k4a.open()
 
@@ -47,7 +47,7 @@ if __name__ == "__main__":
   list_color_im = []
   # vol_bnds 생성
   vol_bnds = np.zeros((3, 2))
-  voxel_size = 0.03
+  voxel_size = 0.01
   iter = 0
   # while True:
   for i in range(0,n_frames):
@@ -58,7 +58,7 @@ if __name__ == "__main__":
         depth_im = capture.transformed_depth.astype(float)
         depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
         depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
-        color_im = cv2.cvtColor(capture.color, cv2.COLOR_BGR2RGB)
+        color_im = convert_to_bgra_if_required(k4a.configuration["color_format"], capture.color)
 
         list_depth_im.append(depth_im)
         list_color_im.append(color_im)
@@ -68,7 +68,7 @@ if __name__ == "__main__":
           cam_pose = np.eye(4)
           first_pose = cam_pose
 
-        elif iter == 1:
+        elif iter >= 1:
           second_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
           ind = random.sample(range(first_Points3D.shape[1]), second_Points3D.shape[1])
           pose, distances, _ = icp(second_Points3D.T, first_Points3D.T[ind, :])  # A, B // maps A onto B : B = pose*A
