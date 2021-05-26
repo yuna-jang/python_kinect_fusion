@@ -68,7 +68,8 @@ def nearest_neighbor(src, dst):
     # src = np.nan_to_num(src)
     # dst = np.nan_to_num(dst)
 
-    neigh = NearestNeighbors(n_neighbors=1)
+    # neigh = NearestNeighbors(n_neighbors=1)
+    neigh = NearestNeighbors(n_neighbors=1, algorithm='kd_tree', metric='euclidean')
     neigh.fit(dst)
 
     distances, indices = neigh.kneighbors(src, return_distance=True)

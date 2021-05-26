@@ -26,8 +26,8 @@ if __name__ == "__main__":
   # frustums in the dataset
   # ======================================================================================================== #
   print("Estimating voxel volume bounds...")
-  n_imgs_begin = 800
-  n_imgs_end = 850
+  n_imgs_begin = 500
+  n_imgs_end = 800
   n_imgs = n_imgs_end - n_imgs_begin
   cam_intr = np.loadtxt("data/camera-intrinsics.txt", delimiter=' ')
   vol_bnds = np.zeros((3,2))
@@ -49,14 +49,15 @@ if __name__ == "__main__":
   # ======================================================================================================== #
   # Initialize voxel volume
   print("Initializing voxel volume...")
-  tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.02)
+  voxel_size=0.02
+  tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=voxel_size)
 
   # Loop through RGB-D images and fuse them together
   t0_elapse = time.time()
 
   i = 0
   for iter in range(n_imgs_begin, n_imgs_end):
-    print("Fusing frame %d/%d"%(i+1, n_imgs))
+    print("=====Fusing frame %d/%d ====="%(i+1, n_imgs))
 
     # Read RGB-D image and camera pose
     color_image = cv2.cvtColor(cv2.imread("data/frame-%06d.color.jpg"%(iter)), cv2.COLOR_BGR2RGB)
@@ -91,27 +92,27 @@ if __name__ == "__main__":
       vol_bnds_seq = np.zeros((3, 2))
       vol_bnds_seq[:, 0] = np.minimum(vol_bnds_seq[:, 0], np.amin(view_frust_pts, axis=1))
       vol_bnds_seq[:, 1] = np.maximum(vol_bnds_seq[:, 1], np.amax(view_frust_pts, axis=1))
-      tsdf_vol_seq = fusion.TSDFVolume(vol_bnds_seq, voxel_size=0.02)
+      tsdf_vol_seq = fusion.TSDFVolume(vol_bnds_seq, voxel_size=voxel_size)
       tsdf_vol_seq.integrate(color_image, depth_im, cam_intr, pose, obs_weight=1.)
       second_Points3D = tsdf_vol_seq.get_point_cloud()[:, 0:3]
-      # second_Points3D = tsdf_vol_seq.get_partial_point_cloud()
 
       # 누적 pointcloud vertex only
       first_Points3D = tsdf_vol.get_partial_point_cloud()
 
       pts_size = min(first_Points3D.shape[0], second_Points3D.shape[0])
       pose, distances, _ = icp(second_Points3D[0:pts_size,:], first_Points3D[0:pts_size,:])  # A, B // maps A onto B : B = pose*A
+      print(f'{pts_size} / {first_Points3D.shape[0]}')
       pose = np.dot(first_pose, pose)
 
-      # pose matrix 검증
-      fig = plt.figure(figsize=(8, 8))
-      ax = fig.add_subplot(projection='3d')  # Axe3D object
-      P = np.vstack((second_Points3D.T, np.ones((1, second_Points3D.T.shape[1])))) # projection
-      proj = pose.dot(P)
-      ax.scatter(second_Points3D[:,0], second_Points3D[0:,1], second_Points3D[0:,2], color='r', s=0.3) # projection 전의 위치
-      ax.scatter(proj.T[:, 0], proj.T[:, 1], proj.T[:, 2], color='g', s=0.3) # icp로 얻은 pose로 projection한 pointcloud
-      ax.scatter(first_Points3D[:, 0], first_Points3D[:, 1], first_Points3D[:, 2], color='b', s=0.3) # 누적 pointcloud 전체
-      plt.show()
+      # # pose matrix 검증
+      # fig = plt.figure(figsize=(8, 8))
+      # ax = fig.add_subplot(projection='3d')  # Axe3D object
+      # P = np.vstack((second_Points3D.T, np.ones((1, second_Points3D.T.shape[1])))) # projection
+      # proj = pose.dot(P)
+      # ax.scatter(second_Points3D[:,0], second_Points3D[0:,1], second_Points3D[0:,2], color='r', s=0.3) # projection 전의 위치
+      # ax.scatter(proj.T[:, 0], proj.T[:, 1], proj.T[:, 2], color='g', s=0.3) # icp로 얻은 pose로 projection한 pointcloud
+      # ax.scatter(first_Points3D[:, 0], first_Points3D[:, 1], first_Points3D[:, 2], color='b', s=0.3) # 누적 pointcloud 전체
+      # plt.show()
 
       cam_pose = pose
       first_pose = cam_pose

@@ -6,7 +6,8 @@ import random
 
 def DepthMap(deepth):
     # 双边滤波
-    filtered = cv2.bilateralFilter(deepth.astype(np.float32), 5, 15, 15)
+    # filtered = cv2.bilateralFilter(deepth.astype(np.float32), 5, 15, 15)
+    filtered = cv2.bilateralFilter(deepth.astype(np.float32), 5, 35, 35)
     pass
     return filtered
 
@@ -21,7 +22,6 @@ def PointCloud(depth, Inverse):
     h, w = depth.shape
     num = h*w
     v_ind, u_ind = np.nonzero(depth)
-    # samples = random.sample(range(len(v_ind)), int(len(v_ind)*0.5))
     samples = random.sample(range(len(v_ind)), 10000)
     v_samples = v_ind[samples]
     u_samples = u_ind[samples]

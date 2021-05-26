@@ -36,7 +36,7 @@ if __name__ == "__main__":
      k4a.start()
      print("키넥트 모드")
   except:
-    filename = r'0_sample_video\moving2.mkv'
+    filename = r'0_sample_video\output2.mkv'
     k4a = PyK4APlayback(filename)
     k4a.open()
     print("비디오 모드")
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     try:
       capture = k4a.get_capture()
     except:
-        capture = k4a.get_next_capture()
+      capture = k4a.get_next_capture()
     if capture.depth is not None and capture.color is not None:
       iter = iter + 1
       print(f"==========={iter}==========")
@@ -69,7 +69,7 @@ if __name__ == "__main__":
       depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
       color_image = cv2.cvtColor(capture.color, cv2.COLOR_BGR2RGB)
 
-       # Set first frame as world system
+      # Set first frame as world system
       if iter == 1:
         first_Depthmap = depth_im
         first_Points3D = PointCloud(first_Depthmap, np.linalg.inv(cam_intr))
