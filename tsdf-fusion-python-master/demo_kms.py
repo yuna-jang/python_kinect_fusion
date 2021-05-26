@@ -59,8 +59,8 @@ if __name__ == "__main__":
     # frustums in the dataset
     # ======================================================================================================== #
     print("Estimating voxel volume bounds...")
-    n_imgs = 100
-    start = 500
+    n_imgs = 1000
+    start = 0
     cam_intr = np.loadtxt("data/camera-intrinsics.txt", delimiter=' ')
     vol_bnds = np.zeros((3, 2))
     for i in range(start, n_imgs+start):
