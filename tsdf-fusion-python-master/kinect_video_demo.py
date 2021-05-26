@@ -34,7 +34,7 @@ if __name__ == "__main__":
   )
 
   # Load video file
-  filename = r'0_sample_video\fixed1.mkv'
+  filename = r'0_sample_video\output2.mkv'
   n_frames = 140
   k4a = PyK4APlayback(filename)
   k4a.open()
@@ -69,7 +69,7 @@ if __name__ == "__main__":
           cam_pose = np.eye(4)
           first_pose = cam_pose
 
-        else:
+        elif iter == 1:
           second_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
           ind = random.sample(range(first_Points3D.shape[1]), second_Points3D.shape[1])
           pose, distances, _ = icp(second_Points3D.T, first_Points3D.T[ind, :])  # A, B // maps A onto B : B = pose*A
@@ -78,10 +78,10 @@ if __name__ == "__main__":
           first_pose = cam_pose
           first_Points3D = second_Points3D
 
-        # Compute camera view frustum and extend convex hull
-        view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, cam_pose)
-        vol_bnds[:, 0] = np.minimum(vol_bnds[:, 0], np.amin(view_frust_pts, axis=1))
-        vol_bnds[:, 1] = np.maximum(vol_bnds[:, 1], np.amax(view_frust_pts, axis=1))
+          # Compute camera view frustum and extend convex hull
+          view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, cam_pose)
+          vol_bnds[:, 0] = np.minimum(vol_bnds[:, 0], np.amin(view_frust_pts, axis=1))
+          vol_bnds[:, 1] = np.maximum(vol_bnds[:, 1], np.amax(view_frust_pts, axis=1))
 
         iter = iter + 1
 
