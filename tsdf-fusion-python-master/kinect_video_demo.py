@@ -34,8 +34,8 @@ if __name__ == "__main__":
   )
 
   # Load video file
-  filename = r'0_sample_video\output2.mkv'
-  n_frames = 140
+  filename = r'0_sample_video\video1.mkv'
+  n_frames = 50
   k4a = PyK4APlayback(filename)
   k4a.open()
 
@@ -59,7 +59,6 @@ if __name__ == "__main__":
         depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
         depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
         color_im = cv2.cvtColor(capture.color, cv2.COLOR_BGR2RGB)
-        color_im = convert_to_bgra_if_required(k4a.configuration["color_format"],capture.color)
 
         list_depth_im.append(depth_im)
         list_color_im.append(color_im)
