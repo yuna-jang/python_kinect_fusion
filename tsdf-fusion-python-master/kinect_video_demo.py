@@ -13,6 +13,7 @@ from helpers import convert_to_bgra_if_required
 from pyk4a import Config, PyK4A
 from pyk4a import PyK4APlayback
 
+# from icp_modules.ICP_kms import *
 from icp_modules.ICP import *
 from icp_modules.FramePreprocessing import PointCloud
 
@@ -30,12 +31,13 @@ if __name__ == "__main__":
     Config(
       color_resolution=pyk4a.ColorResolution.RES_720P,
       depth_mode=pyk4a.DepthMode.NFOV_UNBINNED,
+      color_format=pyk4a.ImageFormat.COLOR_MJPG
     )
   )
 
   # Load video file
-  filename = r'0_sample_video\video1.mkv'
-  n_frames = 20
+  filename = r'0_sample_video\human5.mkv'
+  n_frames = 5
   k4a = PyK4APlayback(filename)
   k4a.open()
 
@@ -58,7 +60,9 @@ if __name__ == "__main__":
         depth_im = capture.transformed_depth.astype(float)
         depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
         depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
-        color_im = convert_to_bgra_if_required(k4a.configuration["color_format"], capture.color)
+        color_capture = convert_to_bgra_if_required(k4a.configuration["color_format"], capture.color)
+        color_im = cv2.cvtColor(color_capture, cv2.COLOR_BGR2RGB)
+
 
         list_depth_im.append(depth_im)
         list_color_im.append(color_im)
