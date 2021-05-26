@@ -84,13 +84,13 @@ if __name__ == "__main__":
       proj = cam_pose.dot(P)[0:3,:]
       first_Points3D = np.hstack((first_Points3D, proj))
 
-      # pose matrix 검증
-      fig = plt.figure(figsize=(8, 8))
-      ax = fig.add_subplot(projection='3d')  # Axe3D object
-      ax.scatter(second_Points3D[0,:], second_Points3D[1,:], second_Points3D[2,:], color='r', s=0.3)  # projection 전의 위치
-      ax.scatter(proj[0, :], proj[1,:], proj[2,:], color='g', s=0.3)  # icp로 얻은 pose로 projection한 pointcloud
-      ax.scatter(first_Points3D[0,:], first_Points3D[1,:], first_Points3D[2,:], color='b', s=0.3)  # 누적 pointcloud 전체
-      plt.show()
+      # # pose matrix 검증
+      # fig = plt.figure(figsize=(8, 8))
+      # ax = fig.add_subplot(projection='3d')  # Axe3D object
+      # ax.scatter(second_Points3D[0,:], second_Points3D[1,:], second_Points3D[2,:], color='r', s=0.3)  # projection 전의 위치
+      # ax.scatter(proj[0, :], proj[1,:], proj[2,:], color='g', s=0.3)  # icp로 얻은 pose로 projection한 pointcloud
+      # ax.scatter(first_Points3D[0,:], first_Points3D[1,:], first_Points3D[2,:], color='b', s=0.3)  # 누적 pointcloud 전체
+      # plt.show()
 
     # Integrate observation into voxel volume (assume color aligned with depth)
     tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
