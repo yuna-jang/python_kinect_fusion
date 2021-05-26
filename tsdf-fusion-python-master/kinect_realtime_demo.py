@@ -30,7 +30,6 @@ if __name__ == "__main__":
     Config(
       color_resolution=pyk4a.ColorResolution.RES_720P,
       depth_mode=pyk4a.DepthMode.NFOV_UNBINNED,
-      synchronized_images_only=True,
     )
   )
   try:
@@ -70,30 +69,22 @@ if __name__ == "__main__":
       depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
       color_image = cv2.cvtColor(capture.color, cv2.COLOR_BGR2RGB)
 
-      # Show
-      # cv2.imshow("Depth", colorize(capture.transformed_depth, (None, 5000)))
-      # cv2.imshow("Color", color_image)
-
-
-      # Set first frame as world system
+       # Set first frame as world system
       if iter == 1:
         first_Depthmap = depth_im
         first_Points3D = PointCloud(first_Depthmap, np.linalg.inv(cam_intr))
         cam_pose = np.eye(4)
         first_pose = cam_pose
       else:
-        # legacy
-        # second_Depthmap = depth_im
-        # second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
+        second_Depthmap = depth_im
+        second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
 
-        second_Points3D = tsdf_vol.get_point_cloud()[0:first_Points3D.shape[1], 0:3]
-
-        pose, distances, _ = icp(second_Points3D.T, first_Points3D) # A, B // maps A onto B : B = pose*A
+        pose, distances, _ = icp(second_Points3D.T, first_Points3D.T) # A, B // maps A onto B : B = pose*A
         pose = np.dot(first_pose,pose)
 
         cam_pose = pose
-        first_Points3D = second_Points3D
         first_pose = cam_pose
+        first_Points3D = second_Points3D
 
       # Compute camera view frustum and extend convex hull
       view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, cam_pose)
@@ -105,7 +96,7 @@ if __name__ == "__main__":
       # Initialize voxel volume
       if iter == 1:
         print("Initializing voxel volume...")
-        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.01)
+        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.005)
       else:
         tsdf_vol.set_vol_bnds(vol_bnds)
 
@@ -117,20 +108,8 @@ if __name__ == "__main__":
       tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)
 
 
-      if iter==200:
+      if iter==100:
           break
-
-
-      key = cv2.waitKey(10)
-      if key != -1:
-        cv2.destroyAllWindows()
-        break
-
-
-    key = cv2.waitKey(10)
-    if key != -1:
-      cv2.destroyAllWindows()
-      break
 
   try:
     k4a.stop()
@@ -143,7 +122,7 @@ if __name__ == "__main__":
   # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
   print("Saving mesh to test_mesh.ply...")
   verts, faces, norms, colors = tsdf_vol.get_mesh()
-  fusion.meshwrite("test_mesh_sample.ply", verts, faces, norms, colors)
+  fusion.meshwrite("test_mesh.ply", verts, faces, norms, colors)
 
   # Get point cloud from voxel volume and save to disk (can be viewed with Meshlab)
   print("Saving point cloud to test_pcd.ply...")
