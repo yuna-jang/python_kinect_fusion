@@ -27,7 +27,7 @@ if __name__ == "__main__":
   # ======================================================================================================== #
   print("Estimating voxel volume bounds...")
   n_imgs_begin = 800
-  n_imgs_end = 850
+  n_imgs_end = 810
   n_imgs = n_imgs_end - n_imgs_begin
   cam_intr = np.loadtxt("data/camera-intrinsics.txt", delimiter=' ')
   vol_bnds = np.zeros((3,2))
@@ -66,56 +66,31 @@ if __name__ == "__main__":
 
     # Set first frame as world system
     if i == 0:
-      first_Depthmap = depth_im
-      previous_Points3D = PointCloud(first_Depthmap, np.linalg.inv(cam_intr))
+      first_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
       cam_pose = np.eye(4)
       first_pose = cam_pose
 
-    elif i == 1:
-      second_Depthmap = depth_im
-      second_Points3D = PointCloud(second_Depthmap, np.linalg.inv(cam_intr))
-      pose, distances, _ = icp(second_Points3D.T, previous_Points3D.T) # A, B // maps A onto B : B = pose*A
-      pose = np.dot(first_pose, pose)
-      cam_pose = pose
+    else:
+      second_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
+
+      ind = random.sample(range(first_Points3D.shape[1]), second_Points3D.shape[1])
+      pose, distances, _ = icp(second_Points3D.T, first_Points3D.T[ind,:])  # A, B // maps A onto B : B = pose*A
+      cam_pose = np.dot(first_pose, pose)
+
       first_pose = cam_pose
-      previous_Points3D = second_Points3D
 
-    elif i > 1:
-      Depthmap = depth_im
-      Points3D = PointCloud(Depthmap, np.linalg.inv(cam_intr))
-
-      # Compute camera view frustum and extend convex hull
-      pose, distances, _ = icp(Points3D.T, previous_Points3D.T)  # A, B // maps A onto B : B = pose*A
-      pose = np.dot(first_pose, pose)
-      view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, pose)
-      vol_bnds_seq = np.zeros((3, 2))
-      vol_bnds_seq[:, 0] = np.minimum(vol_bnds_seq[:, 0], np.amin(view_frust_pts, axis=1))
-      vol_bnds_seq[:, 1] = np.maximum(vol_bnds_seq[:, 1], np.amax(view_frust_pts, axis=1))
-      tsdf_vol_seq = fusion.TSDFVolume(vol_bnds_seq, voxel_size=0.02)
-      tsdf_vol_seq.integrate(color_image, depth_im, cam_intr, pose, obs_weight=1.)
-      second_Points3D = tsdf_vol_seq.get_point_cloud()[:, 0:3]
-      # second_Points3D = tsdf_vol_seq.get_partial_point_cloud()
-
-      # 누적 pointcloud vertex only
-      first_Points3D = tsdf_vol.get_partial_point_cloud()
-
-      pts_size = min(first_Points3D.shape[0], second_Points3D.shape[0])
-      pose, distances, _ = icp(second_Points3D[0:pts_size,:], first_Points3D[0:pts_size,:])  # A, B // maps A onto B : B = pose*A
-      pose = np.dot(first_pose, pose)
+      # pointclouds
+      P = np.vstack((second_Points3D, np.ones((1, second_Points3D.shape[1]))))  # projection
+      proj = cam_pose.dot(P)[0:3,:]
+      first_Points3D = np.hstack((first_Points3D, proj))
 
       # pose matrix 검증
       fig = plt.figure(figsize=(8, 8))
       ax = fig.add_subplot(projection='3d')  # Axe3D object
-      P = np.vstack((second_Points3D.T, np.ones((1, second_Points3D.T.shape[1])))) # projection
-      proj = pose.dot(P)
-      ax.scatter(second_Points3D[:,0], second_Points3D[0:,1], second_Points3D[0:,2], color='r', s=0.3) # projection 전의 위치
-      ax.scatter(proj.T[:, 0], proj.T[:, 1], proj.T[:, 2], color='g', s=0.3) # icp로 얻은 pose로 projection한 pointcloud
-      ax.scatter(first_Points3D[:, 0], first_Points3D[:, 1], first_Points3D[:, 2], color='b', s=0.3) # 누적 pointcloud 전체
+      ax.scatter(second_Points3D[0,:], second_Points3D[1,:], second_Points3D[2,:], color='r', s=0.3)  # projection 전의 위치
+      ax.scatter(proj[0, :], proj[1,:], proj[2,:], color='g', s=0.3)  # icp로 얻은 pose로 projection한 pointcloud
+      ax.scatter(first_Points3D[0,:], first_Points3D[1,:], first_Points3D[2,:], color='b', s=0.3)  # 누적 pointcloud 전체
       plt.show()
-
-      cam_pose = pose
-      first_pose = cam_pose
-      previous_Points3D = Points3D
 
     # Integrate observation into voxel volume (assume color aligned with depth)
     tsdf_vol.integrate(color_image, depth_im, cam_intr, cam_pose, obs_weight=1.)

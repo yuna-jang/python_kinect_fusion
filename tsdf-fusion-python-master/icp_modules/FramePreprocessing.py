@@ -3,18 +3,21 @@ import cv2
 import time
 import random
 
+
 def DepthMap(deepth):
     # 双边滤波
-    dmap = cv2.bilateralFilter(deepth,5,35,35)
+    filtered = cv2.bilateralFilter(deepth.astype(np.float32), 5, 15, 15)
     pass
-    return dmap
+    return filtered
 
-def PointCloud(depth,Inverse):
+
+def PointCloud(depth, Inverse):
     """
     :param depth: DepthMap of one frame
     :param camIn: Camera Intrinsic inverse K^{-1}
     :return: 3D Points Set shape->3*N
     """
+    depth = DepthMap(depth) # Bilateral Filter
     h, w = depth.shape
     num = h*w
     v_ind, u_ind = np.nonzero(depth)
@@ -22,7 +25,7 @@ def PointCloud(depth,Inverse):
     samples = random.sample(range(len(v_ind)), 10000)
     v_samples = v_ind[samples]
     u_samples = u_ind[samples]
-    DepthMap = depth.reshape((1, num))
+    dmap = depth.reshape((1, num))
 
     depth_ind = []
     for i in range(len(v_samples)):
@@ -30,8 +33,8 @@ def PointCloud(depth,Inverse):
         u = u_samples[i]
         index = v*w+u
         depth_ind.append(index)
-    DepthMap = DepthMap[:, depth_ind]
-    uvdMap = np.vstack((u_samples, v_samples, DepthMap))
+    dmap = dmap[:, depth_ind]
+    uvdMap = np.vstack((u_samples, v_samples, dmap))
     Points = np.dot(Inverse, uvdMap)
     return Points
     pass
@@ -59,7 +62,8 @@ def NormalMap(Points,h,w):
             normal = np.cross(vec2-vec1, vec3-vec1)
             normal_map[i].append(normal)
     print('Time Used in NormalMap', time.time()-start_time)
-    return normal_map
+    # normal_map shape = w * h * 3
+    return np.array(normal_map)
 
 
 if __name__ == '__main__':
