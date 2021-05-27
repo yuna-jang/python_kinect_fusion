@@ -13,7 +13,7 @@ from helpers import convert_to_bgra_if_required
 from pyk4a import Config, PyK4A
 from pyk4a import PyK4APlayback
 
-from icp_modules.ICP import *
+from icp_modules.ICP_kms import *
 from icp_modules.FramePreprocessing import PointCloud
 
 from helpers import colorize, convert_to_bgra_if_required
@@ -34,7 +34,7 @@ if __name__ == "__main__":
   )
 
   # Load video file
-  filename = r'0_sample_video\video1.mkv'
+  filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\video1.mkv'
   n_frames = 20
   k4a = PyK4APlayback(filename)
   k4a.open()

@@ -14,7 +14,7 @@ try:
 except Exception as err:
     print('Warning: {}'.format(err))
     print('Failed to import PyCUDA. Running fusion in CPU mode.')
-    FUSION_GPU_MODE = 0
+FUSION_GPU_MODE = 0
 
 
 class TSDFVolume:
