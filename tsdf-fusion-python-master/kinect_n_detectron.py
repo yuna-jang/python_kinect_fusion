@@ -58,7 +58,8 @@ if __name__ == "__main__":
 
     # Load video file
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\video1.mkv'
-    n_frames = 20
+    filename = r'0_sample_video\human5.mkv'
+    n_frames = 5
 
     k4a = PyK4APlayback(filename)
     k4a.open()
@@ -173,8 +174,8 @@ if __name__ == "__main__":
     # Segmentation
     for i in range(0, n_imgs):
         print("Human Body Vertex %d/%d" % (i + 1, n_imgs))
-        depth_im = list_depth_im[iter]
-        color_im = list_color_im[iter]
+        depth_im = list_depth_im[i]
+        color_im = list_color_im[i]
         output = model(color_im)
         not_valid_x, not_valid_y = filter_human(output)
         for not_x, not_y in zip(not_valid_x, not_valid_y):
