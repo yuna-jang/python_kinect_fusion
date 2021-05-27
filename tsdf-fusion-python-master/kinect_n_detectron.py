@@ -183,10 +183,14 @@ if __name__ == "__main__":
             color_im[not_x, not_y] = 0
         print('Depth info')
         val_x, val_y = np.nonzero(depth_im)
-        print('Mean:', np.mean(depth_im[val_x, val_y]),
-              'Std', np.std(depth_im[val_x, val_y]),
-              'Max:', np.max(depth_im[val_x, val_y]),
-              'Min', np.min(depth_im[val_x, val_y]))
+
+        # print('Mean:', np.mean(depth_im[val_x, val_y]),
+        #       'Std', np.std(depth_im[val_x, val_y]),
+        #       'Max:', np.max(depth_im[val_x, val_y]),
+        #       'Min', np.min(depth_im[val_x, val_y]))
+        
+        threshold = np.mean(depth_im[val_x, val_y]) + 2 * np.std(depth_im[val_x, val_y])
+        depth_im[depth_im >= threshold] = 0
         pose = poses[i]
         human_vol.integrate(color_im, depth_im, cam_intr, pose, obs_weight=1.)
 
