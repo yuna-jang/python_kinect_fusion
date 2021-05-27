@@ -72,7 +72,7 @@ if __name__ == "__main__":
     list_color_im = []
     # vol_bnds 생성
     vol_bnds = np.zeros((3, 2))
-    voxel_size = 0.01
+    voxel_size = 0.02
     iter = 0
     # while True:
     for i in range(0, n_frames):
@@ -170,7 +170,7 @@ if __name__ == "__main__":
         # Integrate observation into voxel volume (assume color aligned with depth)
         tsdf_vol.integrate(color_im, depth_im, cam_intr, cam_pose, obs_weight=1.)
         iter = iter + 1
-    
+
     # Segmentation
     for i in range(0, n_imgs):
         print("Human Body Vertex %d/%d" % (i + 1, n_imgs))
@@ -181,6 +181,12 @@ if __name__ == "__main__":
         for not_x, not_y in zip(not_valid_x, not_valid_y):
             depth_im[not_x, not_y] = 0
             color_im[not_x, not_y] = 0
+        print('Depth info')
+        val_x, val_y = np.nonzero(depth_im)
+        print('Mean:', np.mean(depth_im[val_x, val_y]),
+              'Std', np.std(depth_im[val_x, val_y]),
+              'Max:', np.max(depth_im[val_x, val_y]),
+              'Min', np.min(depth_im[val_x, val_y]))
         pose = poses[i]
         human_vol.integrate(color_im, depth_im, cam_intr, pose, obs_weight=1.)
 
