@@ -67,7 +67,7 @@ def icp(A, B, init_pose=None, max_iterations=30, tolerance=0.000001):
     assert A.shape == B.shape
     m = A.shape[1]
     N = min(A.shape[0], B.shape[0])
-    size = min(A.shape[0], B.shape[0], 3000)
+    size = min(A.shape[0], B.shape[0], 4000)
     batch = 10
     for b in range(batch):
         sampler = random.sample(range(N), size)
