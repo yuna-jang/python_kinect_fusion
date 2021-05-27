@@ -72,7 +72,7 @@ if __name__ == "__main__":
     list_color_im = []
     # vol_bnds 생성
     vol_bnds = np.zeros((3, 2))
-    voxel_size = 0.02
+    voxel_size = 0.005
     iter = 0
     # while True:
     for i in range(0, n_frames):
