@@ -283,5 +283,9 @@ crashlytics-build.properties
 fabric.properties
 
 */0_sample_video
+*/data_kinect
+*/data_kinect_demo
 tsdf-fusion-python-master/0_sample_video.zip
 tsdf-fusion-python-master/kms_demo.py
+tsdf-fusion-python-master/data_creator.py
+tsdf-fusion-python-master/kinect_video_demo_from_data_kinect.py

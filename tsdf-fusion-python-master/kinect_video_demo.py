@@ -39,7 +39,7 @@ if __name__ == "__main__":
   # Load video file
   filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\video1.mkv'
   filename = r'0_sample_video\0531\0531_3.mkv'
-  n_frames = 120
+  n_frames = 100
 
   k4a = PyK4APlayback(filename)
   k4a.open()
@@ -67,8 +67,20 @@ if __name__ == "__main__":
         color_capture = convert_to_bgra_if_required(k4a.configuration["color_format"], capture.color)
         color_im = cv2.cvtColor(color_capture, cv2.COLOR_BGR2RGB)
 
+        filtered_depth = cv2.bilateralFilter(depth_im.astype(np.float32), 5, 35, 35)
+        filtered_color = cv2.bilateralFilter(color_im, 10, 50, 50)
+        sharpening_2 = np.array([[-1, -1, -1, -1, -1],
+                                 [-1, 2, 2, 2, -1],
+                                 [-1, 2, 9, 2, -1],
+                                 [-1, 2, 2, 2, -1],
+                                 [-1, -1, -1, -1, -1]]) / 9.0
+        filtered_color = cv2.filter2D(filtered_color, -1, sharpening_2)
+
+        # cv2.imwrite(fr'0_sample_video\frames\{i}_depth.jpg', filtered_depth)
+        cv2.imwrite(fr'0_sample_video\frames\{i}_color.jpg', filtered_color)
+
         list_depth_im.append(depth_im)
-        list_color_im.append(color_im)
+        list_color_im.append(filtered_color)
 
         if iter == 0:
           first_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
@@ -138,24 +150,24 @@ if __name__ == "__main__":
       pose_real, _, _ = icp(second_Points3D[samples_second, :],first_Points3D[samples_first, :])  # A, B // maps A onto B : B = pose*A
       pose_real = np.dot(previous_pose, pose_real)
 
-      # icp points 검증
-      fig = plt.figure(figsize=(8, 8))
-      ax = fig.add_subplot(projection='3d')  # Axe3D object
-      ax.scatter(second_Points3D[samples_second, 0], second_Points3D[samples_second, 1], second_Points3D[samples_second, 2], color='r', s=0.3)
-      ax.scatter(first_Points3D[samples_first, 0], first_Points3D[samples_first, 1], first_Points3D[samples_first, 2], color='b', s=0.3)
-      plt.show()
-
-      # pose matrix 검증
-      fig = plt.figure(figsize=(8, 8))
-      ax = fig.add_subplot(projection='3d')  # Axe3D object
-      P = np.vstack((second_Points3D.T, np.ones((1, second_Points3D.T.shape[1]))))  # projection
-      proj = np.dot(pose_real, P)
-      # ax.scatter(P.T[samples, 0], P.T[samples, 1], P.T[samples, 2], color='r', s=0.3)
-      # ax.scatter(proj.T[samples, 0], proj.T[samples, 1], proj.T[samples, 2], color='g', s=0.3)
-      # ax.scatter(first_Points3D[samples, 0], first_Points3D[samples, 1], first_Points3D[samples, 2], color='b', s=0.3)
-      ax.scatter(proj.T[:, 0], proj.T[:, 1], proj.T[:, 2], color='g', s=0.3)
-      ax.scatter(first_Points3D[:, 0], first_Points3D[:, 1], first_Points3D[:, 2], color='b', s=0.3)
-      plt.show()
+      # # icp points 검증
+      # fig = plt.figure(figsize=(8, 8))
+      # ax = fig.add_subplot(projection='3d')  # Axe3D object
+      # ax.scatter(second_Points3D[samples_second, 0], second_Points3D[samples_second, 1], second_Points3D[samples_second, 2], color='r', s=0.3)
+      # ax.scatter(first_Points3D[samples_first, 0], first_Points3D[samples_first, 1], first_Points3D[samples_first, 2], color='b', s=0.3)
+      # plt.show()
+      #
+      # # pose matrix 검증
+      # fig = plt.figure(figsize=(8, 8))
+      # ax = fig.add_subplot(projection='3d')  # Axe3D object
+      # P = np.vstack((second_Points3D.T, np.ones((1, second_Points3D.T.shape[1]))))  # projection
+      # proj = np.dot(pose_real, P)
+      # # ax.scatter(P.T[samples, 0], P.T[samples, 1], P.T[samples, 2], color='r', s=0.3)
+      # # ax.scatter(proj.T[samples, 0], proj.T[samples, 1], proj.T[samples, 2], color='g', s=0.3)
+      # # ax.scatter(first_Points3D[samples, 0], first_Points3D[samples, 1], first_Points3D[samples, 2], color='b', s=0.3)
+      # ax.scatter(proj.T[:, 0], proj.T[:, 1], proj.T[:, 2], color='g', s=0.3)
+      # ax.scatter(first_Points3D[:, 0], first_Points3D[:, 1], first_Points3D[:, 2], color='b', s=0.3)
+      # plt.show()
 
       cam_pose = pose_real
       previous_pose = cam_pose
@@ -163,14 +175,6 @@ if __name__ == "__main__":
 
     # Integrate observation into voxel volume (assume color aligned with depth)
     tsdf_vol.integrate(color_im, depth_im, cam_intr, cam_pose, obs_weight=1.)
-
-    # # pointcloud 검증
-    # pointcloud = tsdf_vol.get_point_cloud()[:, 0:3]
-    # fig = plt.figure(figsize=(8, 8))
-    # ax = fig.add_subplot(projection='3d')  # Axe3D object
-    # ax.scatter(pointcloud[:, 0], pointcloud[:, 1], pointcloud[:, 2], color='b', s=0.3)
-    # plt.show()
-
     iter=iter+1
 
 
