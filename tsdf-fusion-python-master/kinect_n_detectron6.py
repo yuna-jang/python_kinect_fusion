@@ -10,8 +10,8 @@ import pyk4a
 from helpers import convert_to_bgra_if_required
 from pyk4a import Config, PyK4A
 from pyk4a import PyK4APlayback
-from icp_modules.ICP_kms import *
-from icp_modules.FramePreprocessing import PointCloud
+from icp_modules.ICP_point_to_plane import *
+from icp_modules.FrameMaps_kms import *
 from helpers import colorize, convert_to_bgra_if_required
 from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor
@@ -57,15 +57,14 @@ if __name__ == "__main__":
     )
 
     # Load video file
-    # filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\video1.mkv'
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\human6.mkv'
+    # filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\0531_2.mkv'
     n_frames = 4
-
 
     k4a = PyK4APlayback(filename)
     k4a.open()
 
-    # Load Kinect's intrinsic parameter
+    # Load Kinect's intrinsic parameter 3X3
     cam_intr = k4a.calibration.get_camera_matrix(pyk4a.calibration.CalibrationType.COLOR)
 
     # List 생성
@@ -83,23 +82,36 @@ if __name__ == "__main__":
             # Read depth and color image
             depth_im = capture.transformed_depth.astype(float)
             depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
-            depth_im[depth_im > 5.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
+            depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
             color_capture = convert_to_bgra_if_required(k4a.configuration["color_format"], capture.color)
             color_im = cv2.cvtColor(color_capture, cv2.COLOR_BGR2RGB)
-
+            H, W, d_ = color_im.shape
             list_depth_im.append(depth_im)
             list_color_im.append(color_im)
 
             if iter == 0:
-                first_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
+                first_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))  # Nx3
                 cam_pose = np.eye(4)
                 first_pose = cam_pose
 
             elif iter >= 1:
-                second_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
-                ind = random.sample(range(first_Points3D.shape[1]), second_Points3D.shape[1])
-                pose, distances, _ = icp(second_Points3D.T,
-                                         first_Points3D.T[ind, :])  # A, B // maps A onto B : B = pose*A
+                second_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))  # Nx3
+                ind = random.sample(range(first_Points3D.shape[0]), second_Points3D.shape[0])
+                normal_map = NormalMap(second_Points3D.T, H, W)   # 3xN이 input
+                pose, distances, _ = point_to_plane(second_Points3D,
+                                         first_Points3D[ind, :], normal_map)  # A, B // maps A onto B : B = pose*A
+
+                ## visualize pose result
+                fig = plt.figure(figsize=(8, 8))
+                ax = fig.add_subplot(projection='3d')  # Axe3D object
+                P = np.vstack((second_Points3D, np.ones((1, second_Points3D.shape[1]))))  # projection
+                # ax.scatter(second_Points3D.T[:, 0], second_Points3D.T[:, 1], second_Points3D.T[:, 2], color='g', s=0.5)
+                proj = pose.dot(P)
+                ax.scatter(P.T[:, 0], P.T[:, 1], P.T[:, 2], color='r', s=0.3)
+                ax.scatter(first_Points3D.T[:, 0], first_Points3D.T[:, 1], first_Points3D.T[:, 2], color='b', s=0.3)
+                plt.show()
+
+
                 cam_pose = np.dot(first_pose, pose)
 
                 first_pose = cam_pose
