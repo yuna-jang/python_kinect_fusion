@@ -58,8 +58,8 @@ if __name__ == "__main__":
 
     # Load video file
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\video1.mkv'
-    filename = r'0_sample_video\human5.mkv'
-    n_frames = 5
+    filename = r'0_sample_video\yuna2.mkv'
+    n_frames = 60
 
     k4a = PyK4APlayback(filename)
     k4a.open()
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     # while True:
     for i in range(0, n_frames):
         capture = k4a.get_next_capture()
-        if capture.depth is not None and capture.color is not None:
+        if capture.depth is not None and capture.color is not None and i%3==0:
             print(f"==========={iter}==========")
             # Read depth and color image
             depth_im = capture.transformed_depth.astype(float)

@@ -77,7 +77,7 @@ def nearest_neighbor(src, dst):
 
 
 
-def icp(A, B, init_pose=None, max_iterations=30, tolerance=0.0001):
+def icp(A, B, init_pose=None, max_iterations=50, tolerance=0.0001):
     '''
     The Iterative Closest Point method: finds best-fit transform that maps points A on to points B
     Input:
@@ -93,7 +93,7 @@ def icp(A, B, init_pose=None, max_iterations=30, tolerance=0.0001):
         distances: Euclidean distances (errors) of the nearest neighbor
         i: number of iterations to converge
     '''
-    # print(A.shape, B.shape) # 대략 30만개 X 3
+    # print(A.shape, B.shape)
     assert A.shape == B.shape
     # select Nonzero(=outlier)
     Ao = A.shape[0]
@@ -128,11 +128,11 @@ def icp(A, B, init_pose=None, max_iterations=30, tolerance=0.0001):
 
     for i in range(max_iterations):
         # find the nearest neighbors between the current source and destination points
-        src = np.nan_to_num(src)
-        dst = np.nan_to_num(dst)
+        # src = np.nan_to_num(src)
+        # dst = np.nan_to_num(dst)
         distances, indices = nearest_neighbor(src[:m, :].T, dst[:m,:].T)
-        src = np.nan_to_num(src)
-        dst = np.nan_to_num(dst)
+        # src = np.nan_to_num(src)
+        # dst = np.nan_to_num(dst)
 
         # compute the transformation between the current source and nearest destination points
         # T, _, _ = best_fit_transform(src[:m,:].T, dst[:m,indices].T)
@@ -148,9 +148,9 @@ def icp(A, B, init_pose=None, max_iterations=30, tolerance=0.0001):
             break
         prev_error = mean_error
     # print('calculate final transformation')
-    # calculate final transformation
-    A = np.nan_to_num(A)
-    src = np.nan_to_num(src)
+    # # calculate final transformation
+    # A = np.nan_to_num(A)
+    # src = np.nan_to_num(src)
     T, _, _, s = best_fit_transform(A[sampler, :], src[:m, :].T)
 
     return T, distances, i

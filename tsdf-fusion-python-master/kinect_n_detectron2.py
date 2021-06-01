@@ -58,8 +58,8 @@ if __name__ == "__main__":
 
     # Load video file
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\video1.mkv'
-    filename = r'0_sample_video\human5.mkv'
-    n_frames = 5
+    filename = r'0_sample_video\yuna2.mkv'
+    n_frames = 100
 
     k4a = PyK4APlayback(filename)
     k4a.open()
@@ -82,7 +82,7 @@ if __name__ == "__main__":
             # Read depth and color image
             depth_im = capture.transformed_depth.astype(float)
             depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
-            depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
+            depth_im[depth_im > 5.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
             color_capture = convert_to_bgra_if_required(k4a.configuration["color_format"], capture.color)
             color_im = cv2.cvtColor(color_capture, cv2.COLOR_BGR2RGB)
 
