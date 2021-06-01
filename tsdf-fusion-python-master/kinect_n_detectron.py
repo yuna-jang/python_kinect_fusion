@@ -10,7 +10,8 @@ import pyk4a
 from helpers import convert_to_bgra_if_required
 from pyk4a import Config, PyK4A
 from pyk4a import PyK4APlayback
-from icp_modules.ICP_kms import *
+# from icp_modules.ICP_kms import *
+from icp_modules.ICP import *
 from icp_modules.FramePreprocessing import PointCloud
 from helpers import colorize, convert_to_bgra_if_required
 from detectron2 import model_zoo
@@ -59,6 +60,7 @@ if __name__ == "__main__":
     # Load video file
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\video1.mkv'
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\human6.mkv'
+
     n_frames = 5
 
     k4a = PyK4APlayback(filename)
@@ -72,7 +74,7 @@ if __name__ == "__main__":
     list_color_im = []
     # vol_bnds 생성
     vol_bnds = np.zeros((3, 2))
-    voxel_size = 0.005
+    voxel_size = 0.01
     iter = 0
     # while True:
     for i in range(0, n_frames):
@@ -82,7 +84,7 @@ if __name__ == "__main__":
             # Read depth and color image
             depth_im = capture.transformed_depth.astype(float)
             depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
-            depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
+            depth_im[depth_im >= 5] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
             color_capture = convert_to_bgra_if_required(k4a.configuration["color_format"], capture.color)
             color_im = cv2.cvtColor(color_capture, cv2.COLOR_BGR2RGB)
 
@@ -177,13 +179,18 @@ if __name__ == "__main__":
         depth_im = list_depth_im[i]
         color_im = list_color_im[i]
         output = model(color_im)
+        # visualization
+        v = Visualizer(color_im[:, :, ::-1], MetadataCatalog.get(model.cfg.DATASETS.TRAIN[0]), scale=1.2)
+        v = v.draw_instance_predictions(output["instances"].to("cpu"))
+        cv2.imwrite(rf'0_sample_video\data_detectron\{i}_orig.jpg',color_im)
+        cv2.imwrite(rf'0_sample_video\data_detectron\{i}_seg.jpg',v.get_image()[:,:,::-1])
         not_valid_x, not_valid_y = filter_human(output)
         for not_x, not_y in zip(not_valid_x, not_valid_y):
             depth_im[not_x, not_y] = 0
             color_im[not_x, not_y] = 0
         print('Depth info')
         val_x, val_y = np.nonzero(depth_im)
-        
+
         threshold = np.mean(depth_im[val_x, val_y]) + 2 * np.std(depth_im[val_x, val_y])
         depth_im[depth_im >= threshold] = 0
         pose = poses[i]
@@ -193,9 +200,9 @@ if __name__ == "__main__":
     print("Saving mesh")
     verts, faces, norms, colors = human_vol.get_mesh()
     # verts, faces, norms, colors = tsdf_vol.get_mesh()
-    fusion.meshwrite("human_mesh.ply", verts, faces, norms, colors)
+    fusion.meshwrite("human_mesh_home.ply", verts, faces, norms, colors)
 
     # Get point cloud from voxel volume and save to disk (can be viewed with Meshlab)
     print("Saving point cloud")
     point_cloud = human_vol.get_point_cloud()
-    fusion.pcwrite("human_pcd.ply", point_cloud)
+    fusion.pcwrite("human_pcd_home.ply", point_cloud)
