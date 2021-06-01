@@ -83,6 +83,7 @@ def icp(A, B, init_pose=None, max_iterations=30, tolerance=0.000001):
             src = np.nan_to_num(src)
             dst = np.nan_to_num(dst)
             distances, indices = nearest_neighbor(src[:m, :].T, dst[:m,:].T)
+
             T, _, _, s = best_fit_transform(src[:m, :].T, dst[:m, indices].T)
 
             src = T.dot(src) * s

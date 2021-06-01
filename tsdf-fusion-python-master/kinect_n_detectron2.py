@@ -57,9 +57,9 @@ if __name__ == "__main__":
     )
 
     # Load video file
-    filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\video1.mkv'
-    filename = r'0_sample_video\human5.mkv'
-    n_frames = 5
+    # filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\video1.mkv'
+    filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\human6.mkv'
+    n_frames = 4
 
     k4a = PyK4APlayback(filename)
     k4a.open()
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     list_color_im = []
     # vol_bnds 생성
     vol_bnds = np.zeros((3, 2))
-    voxel_size = 0.02
+    voxel_size = 0.03
     iter = 0
     # while True:
     for i in range(0, n_frames):

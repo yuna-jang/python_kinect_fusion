@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
     # Load video file
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\video1.mkv'
-    filename = r'0_sample_video\human5.mkv'
+    filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\human6.mkv'
     n_frames = 5
 
     k4a = PyK4APlayback(filename)
