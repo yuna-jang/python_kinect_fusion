@@ -11,7 +11,7 @@ from helpers import convert_to_bgra_if_required
 from pyk4a import Config, PyK4A
 from pyk4a import PyK4APlayback
 from icp_modules.ICP_point_to_plane import *
-from icp_modules.FrameMaps_kms import *
+from icp_modules.FrameMaps_kms2 import *
 from helpers import colorize, convert_to_bgra_if_required
 from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor
@@ -34,6 +34,16 @@ def SEG_model():
     return predictor
 
 
+def Joint_model():
+    cfg = get_cfg()
+    cfg.merge_from_file(model_zoo.get_config_file("COCO-Keypoints/keypoint_rcnn_R_50_FPN_3x.yaml"))
+    cfg.MODEL.DEVICE = 'cpu'
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7
+    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-Keypoints/keypoint_rcnn_R_50_FPN_3x.yaml")
+    predictor = DefaultPredictor(cfg)
+    return predictor
+
+
 def filter_human(output):
     classes = output["instances"].pred_classes
     human = list(np.nonzero(np.where(classes.numpy() == 0, 1, 0))[0])
@@ -44,8 +54,25 @@ def filter_human(output):
     return x, y
 
 
+def filter_joint(output):
+    joints = output["instances"].pred_keypoints[0][:, :2].numpy()
+    return joints
+
+
+def joint_to_3D(joints, Inverse, depth_im):
+    Joints = np.zeros((3, 17))
+    for i in range(17):
+        yy, xx = joints[i]
+        d = depth_im[int(round(yy)), int(round(xx))]
+        Joints[:, i] = d * np.dot(Inverse, np.array([xx, yy, 1]).T)
+    return Joints
+
+# def joint_bundle(joint_3D, poses):
+
+
 if __name__ == "__main__":
-    model = SEG_model()
+    seg_model = SEG_model()
+    joint_model = Joint_model()
 
     # Open kinect camera by realtime
     k4a = PyK4A(
@@ -66,7 +93,7 @@ if __name__ == "__main__":
 
     # Load Kinect's intrinsic parameter 3X3
     cam_intr = k4a.calibration.get_camera_matrix(pyk4a.calibration.CalibrationType.COLOR)
-
+    invK = np.linalg.inv(cam_intr)
     # List 생성
     list_depth_im = []
     list_color_im = []
@@ -90,26 +117,27 @@ if __name__ == "__main__":
             list_color_im.append(color_im)
 
             if iter == 0:
-                first_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))  # Nx3
+                first_Points3D, sample = PointCloud(depth_im, invK)  # Nx3
                 cam_pose = np.eye(4)
                 first_pose = cam_pose
+                prev_normal = NormalMap(sample, depth_im, invK)  # Normal map이 destination의 normal map 이어야함.
+
 
             elif iter >= 1:
-                second_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))  # Nx3
-                ind = random.sample(range(first_Points3D.shape[0]), second_Points3D.shape[0])
-                normal_map = NormalMap(second_Points3D.T, H, W)   # 3xN이 input
-                pose, distances, _ = point_to_plane(second_Points3D,
-                                         first_Points3D[ind, :], normal_map)  # A, B // maps A onto B : B = pose*A
+                second_Points3D, sample = PointCloud(depth_im, invK)  # Nx3
+                pose = point_to_plane(second_Points3D,
+                                         first_Points3D, prev_normal)  # A, B // maps A onto B : B = pose*A
+                prev_normal = NormalMap(sample, depth_im, invK)
 
-                ## visualize pose result
-                fig = plt.figure(figsize=(8, 8))
-                ax = fig.add_subplot(projection='3d')  # Axe3D object
-                P = np.vstack((second_Points3D, np.ones((1, second_Points3D.shape[1]))))  # projection
-                # ax.scatter(second_Points3D.T[:, 0], second_Points3D.T[:, 1], second_Points3D.T[:, 2], color='g', s=0.5)
-                proj = pose.dot(P)
-                ax.scatter(P.T[:, 0], P.T[:, 1], P.T[:, 2], color='r', s=0.3)
-                ax.scatter(first_Points3D.T[:, 0], first_Points3D.T[:, 1], first_Points3D.T[:, 2], color='b', s=0.3)
-                plt.show()
+                # ## visualize pose result
+                # fig = plt.figure(figsize=(8, 8))
+                # ax = fig.add_subplot(projection='3d')  # Axe3D object
+                # P = np.vstack((second_Points3D.T, np.ones((1, second_Points3D.shape[0]))))  # projection  P = 4XN
+                # # ax.scatter(second_Points3D.T[:, 0], second_Points3D.T[:, 1], second_Points3D.T[:, 2], color='g', s=0.5)
+                # proj = pose.dot(P)
+                # ax.scatter(P.T[:, 0], P.T[:, 1], P.T[:, 2], color='r', s=0.3)
+                # ax.scatter(first_Points3D[:, 0], first_Points3D[:, 1], first_Points3D[:, 2], color='b', s=0.3) # fP = Nx3
+                # plt.show()
 
 
                 cam_pose = np.dot(first_pose, pose)
@@ -123,16 +151,18 @@ if __name__ == "__main__":
                 vol_bnds[:, 1] = np.maximum(vol_bnds[:, 1], np.amax(view_frust_pts, axis=1))
 
             iter = iter + 1
-
     # ======================================================================================================== #
     print("Initializing voxel volume...")
     tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=voxel_size)
     human_vol = fusion.TSDFVolume(vol_bnds, voxel_size=voxel_size)
     k4a.close()
-    poses = []
+
     # ===============Integrate===============
     n_imgs = len(list_depth_im)
     iter = 0
+    poses = []
+    joints_3D = []
+
     for iter in range(0, n_imgs):
         print("Fusing frame %d/%d" % (iter + 1, n_imgs))
 
@@ -140,7 +170,7 @@ if __name__ == "__main__":
         depth_im = list_depth_im[iter]
         color_im = list_color_im[iter]
 
-        output = model(color_im)
+        output = seg_model(color_im)
         not_valid_x, not_valid_y = filter_human(output)
         for not_x, not_y in zip(not_valid_x, not_valid_y):
             depth_im[not_x, not_y] = 0
@@ -148,25 +178,33 @@ if __name__ == "__main__":
         val_x, val_y = np.nonzero(depth_im)
         threshold = np.mean(depth_im[val_x, val_y]) + 2 * np.std(depth_im[val_x, val_y])
         depth_im[depth_im >= threshold] = 0
+        H, W = depth_im.shape
+
+        output = joint_model(color_im)
+        joint = filter_joint(output)
+        joints_3D.append(joint_to_3D(joint, invK, depth_im))
 
         # Set first frame as world system
         if iter == 0:
-            previous_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
+            previous_Points3D, _ = PointCloud(depth_im, invK)
             cam_pose = np.eye(4)
             previous_pose = cam_pose
+            prev_normal = NormalMap(sample, depth_im, invK)
 
         elif iter == 1:
-            second_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
-            pose, distances, _ = icp(second_Points3D.T, previous_Points3D.T)  # A, B // maps A onto B : B = pose*A
+            second_Points3D, sample = PointCloud(depth_im, invK)
+            pose = point_to_plane(second_Points3D,
+                                  first_Points3D, prev_normal)  # A, B // maps A onto B : B = pose*A
+            prev_normal = NormalMap(sample, depth_im, invK)
             cam_pose = np.dot(previous_pose, pose)
             previous_pose = cam_pose
             previous_Points3D = second_Points3D
 
         elif iter > 1:
-            Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
-
+            Points3D, sample = PointCloud(depth_im, invK)
             # Compute camera view frustum and extend convex hull
-            pose, distances, _ = icp(Points3D.T, previous_Points3D.T)  # A, B // maps A onto B : B = pose*A
+            pose = point_to_plane(Points3D, previous_Points3D, prev_normal)  # A, B // maps A onto B : B = pose*A
+            prev_normal = NormalMap(sample, depth_im, invK)
             pose = np.dot(previous_pose, pose)
             view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, pose)
             vol_bnds_seq = np.zeros((3, 2))
@@ -174,15 +212,15 @@ if __name__ == "__main__":
             vol_bnds_seq[:, 1] = np.maximum(vol_bnds_seq[:, 1], np.amax(view_frust_pts, axis=1))
             tsdf_vol_seq = fusion.TSDFVolume(vol_bnds_seq, voxel_size=voxel_size)
             tsdf_vol_seq.integrate(color_im, depth_im, cam_intr, pose, obs_weight=1.)
-            second_Points3D = tsdf_vol_seq.get_point_cloud()[:, 0:3]
-
-            # 누적 pointcloud vertex only
-            first_Points3D = tsdf_vol.get_partial_point_cloud()
-
-            pts_size = min(first_Points3D.shape[0], second_Points3D.shape[0])
-            pose, distances, _ = icp(second_Points3D[0:pts_size, :],
-                                     first_Points3D[0:pts_size, :])  # A, B // maps A onto B : B = pose*A
-            print(f'{pts_size} / {first_Points3D.shape[0]}')
+            # second_Points3D = tsdf_vol_seq.get_point_cloud()[:, 0:3]
+            #
+            # # 누적 pointcloud vertex only
+            # first_Points3D = tsdf_vol.get_partial_point_cloud()
+            #
+            # pts_size = min(first_Points3D.shape[0], second_Points3D.shape[0])
+            # pose = point_to_plane(second_Points3D[0:pts_size, :],
+            #                          first_Points3D[0:pts_size, :], normal_map)  # A, B // maps A onto B : B = pose*A
+            # print(f'{pts_size} / {first_Points3D.shape[0]}')
             pose = np.dot(previous_pose, pose)
 
             cam_pose = pose
