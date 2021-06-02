@@ -11,6 +11,7 @@ from helpers import convert_to_bgra_if_required
 from pyk4a import Config, PyK4A
 from pyk4a import PyK4APlayback
 from icp_modules.ICP_point_to_plane import *
+from icp_modules.ICP_kms import *
 from icp_modules.FrameMaps_kms2 import *
 from helpers import colorize, convert_to_bgra_if_required
 from detectron2 import model_zoo
@@ -116,7 +117,7 @@ if __name__ == "__main__":
     # Load video file
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\human6.mkv'
     # filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\0531_2.mkv'
-    n_frames = 4
+    n_frames = 3
 
     k4a = PyK4APlayback(filename)
     k4a.open()
@@ -129,31 +130,31 @@ if __name__ == "__main__":
     list_color_im = []
     # vol_bnds 생성
     vol_bnds = np.zeros((3, 2))
-    voxel_size = 0.03
+    voxel_size = 0.05
     iter = 0
+    poses = []
     # while True:
     for i in range(0, n_frames):
         capture = k4a.get_next_capture()
         if capture.depth is not None and capture.color is not None:
-            print(f"==========={iter}==========")
+            print(f"==========={i}==========")
             # Read depth and color image
             depth_im = capture.transformed_depth.astype(float)
-            depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
-            depth_im[depth_im == 65.535] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
+            depth_im /= 1000.
+            depth_im[depth_im == 65.535] = 0
             color_capture = convert_to_bgra_if_required(k4a.configuration["color_format"], capture.color)
             color_im = cv2.cvtColor(color_capture, cv2.COLOR_BGR2RGB)
             H, W, d_ = color_im.shape
             list_depth_im.append(depth_im)
             list_color_im.append(color_im)
 
-            if iter == 0:
+            if i == 0:
                 first_Points3D, sample = PointCloud(depth_im, invK)  # Nx3
                 cam_pose = np.eye(4)
                 first_pose = cam_pose
                 prev_normal = NormalMap(sample, depth_im, invK)  # Normal map이 destination의 normal map 이어야함.
 
-
-            elif iter >= 1:
+            elif i >= 1:
                 second_Points3D, sample = PointCloud(depth_im, invK)  # Nx3
                 pose = point_to_plane(second_Points3D,
                                       first_Points3D, prev_normal)  # A, B // maps A onto B : B = pose*A
@@ -168,7 +169,6 @@ if __name__ == "__main__":
                 # ax.scatter(P.T[:, 0], P.T[:, 1], P.T[:, 2], color='r', s=0.3)
                 # ax.scatter(first_Points3D[:, 0], first_Points3D[:, 1], first_Points3D[:, 2], color='b', s=0.3) # fP = Nx3
                 # plt.show()
-
                 cam_pose = np.dot(first_pose, pose)
 
                 first_pose = cam_pose
@@ -178,22 +178,20 @@ if __name__ == "__main__":
                 view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, cam_pose)
                 vol_bnds[:, 0] = np.minimum(vol_bnds[:, 0], np.amin(view_frust_pts, axis=1))
                 vol_bnds[:, 1] = np.maximum(vol_bnds[:, 1], np.amax(view_frust_pts, axis=1))
-
-            iter = iter + 1
+            poses.append(cam_pose)
+            i = i + 1
     # ======================================================================================================== #
     print("Initializing voxel volume...")
     tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=voxel_size)
-    human_vol = fusion.TSDFVolume(vol_bnds, voxel_size=voxel_size)
     k4a.close()
 
     # ===============Integrate===============
     n_imgs = len(list_depth_im)
     iter = 0
-    # poses = []
     joints_3D = []
 
-    for iter in range(0, n_imgs):
-        print("Fusing frame %d/%d" % (iter + 1, n_imgs))
+    for i in range(0, n_imgs):
+        print("Fusing frame %d/%d" % (i + 1, n_imgs))
 
         # Read depth and color image
         depth_im = list_depth_im[iter]
@@ -213,56 +211,57 @@ if __name__ == "__main__":
         joint = filter_joint(output)
         joints_3D.append(joint_to_3D(joint, invK, depth_im))
 
-        # Set first frame as world system
-        if iter == 0:
-            previous_Points3D, _ = PointCloud(depth_im, invK)
-            cam_pose = np.eye(4)
-            previous_pose = cam_pose
-            prev_normal = NormalMap(sample, depth_im, invK)
-
-        elif iter == 1:
-            second_Points3D, sample = PointCloud(depth_im, invK)
-            pose = point_to_plane(second_Points3D,
-                                  first_Points3D, prev_normal)  # A, B // maps A onto B : B = pose*A
-            prev_normal = NormalMap(sample, depth_im, invK)
-            cam_pose = np.dot(previous_pose, pose)
-            previous_pose = cam_pose
-            previous_Points3D = second_Points3D
-
-        elif iter > 1:
-            Points3D, sample = PointCloud(depth_im, invK)
-            # Compute camera view frustum and extend convex hull
-            pose = point_to_plane(Points3D, previous_Points3D, prev_normal)  # A, B // maps A onto B : B = pose*A
-            prev_normal = NormalMap(sample, depth_im, invK)
-            pose = np.dot(previous_pose, pose)
-            view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, pose)
-            vol_bnds_seq = np.zeros((3, 2))
-            vol_bnds_seq[:, 0] = np.minimum(vol_bnds_seq[:, 0], np.amin(view_frust_pts, axis=1))
-            vol_bnds_seq[:, 1] = np.maximum(vol_bnds_seq[:, 1], np.amax(view_frust_pts, axis=1))
-            tsdf_vol_seq = fusion.TSDFVolume(vol_bnds_seq, voxel_size=voxel_size)
-            tsdf_vol_seq.integrate(color_im, depth_im, cam_intr, pose, obs_weight=1.)
-            # second_Points3D = tsdf_vol_seq.get_point_cloud()[:, 0:3]
-            #
-            # # 누적 pointcloud vertex only
-            # first_Points3D = tsdf_vol.get_partial_point_cloud()
-            #
-            # pts_size = min(first_Points3D.shape[0], second_Points3D.shape[0])
-            # pose = point_to_plane(second_Points3D[0:pts_size, :],
-            #                          first_Points3D[0:pts_size, :], normal_map)  # A, B // maps A onto B : B = pose*A
-            # print(f'{pts_size} / {first_Points3D.shape[0]}')
-            pose = np.dot(previous_pose, pose)
-
-            cam_pose = pose
-            previous_pose = cam_pose
-            previous_Points3D = Points3D
+        # # Set first frame as world system
+        # if iter == 0:
+        #     previous_Points3D, _ = PointCloud(depth_im, invK)
+        #     cam_pose = np.eye(4)
+        #     previous_pose = cam_pose
+        #     prev_normal = NormalMap(sample, depth_im, invK)
+        #
+        # elif iter == 1:
+        #     second_Points3D, sample = PointCloud(depth_im, invK)
+        #     pose = point_to_plane(second_Points3D,
+        #                           first_Points3D, prev_normal)  # A, B // maps A onto B : B = pose*A
+        #     prev_normal = NormalMap(sample, depth_im, invK)
+        #     cam_pose = np.dot(previous_pose, pose)
+        #     previous_pose = cam_pose
+        #     previous_Points3D = second_Points3D
+        #
+        # elif iter > 1:
+        #     Points3D, sample = PointCloud(depth_im, invK)
+        #     # Compute camera view frustum and extend convex hull
+        #     pose = point_to_plane(Points3D, previous_Points3D, prev_normal)  # A, B // maps A onto B : B = pose*A
+        #     prev_normal = NormalMap(sample, depth_im, invK)
+        #     pose = np.dot(previous_pose, pose)
+        #     view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, pose)
+        #     vol_bnds_seq = np.zeros((3, 2))
+        #     vol_bnds_seq[:, 0] = np.minimum(vol_bnds_seq[:, 0], np.amin(view_frust_pts, axis=1))
+        #     vol_bnds_seq[:, 1] = np.maximum(vol_bnds_seq[:, 1], np.amax(view_frust_pts, axis=1))
+        #     tsdf_vol_seq = fusion.TSDFVolume(vol_bnds_seq, voxel_size=voxel_size)
+        #     tsdf_vol_seq.integrate(color_im, depth_im, cam_intr, pose, obs_weight=1.)
+        #     # second_Points3D = tsdf_vol_seq.get_point_cloud()[:, 0:3]
+        #     #
+        #     # # 누적 pointcloud vertex only
+        #     # first_Points3D = tsdf_vol.get_partial_point_cloud()
+        #     #
+        #     # pts_size = min(first_Points3D.shape[0], second_Points3D.shape[0])
+        #     # pose = point_to_plane(second_Points3D[0:pts_size, :],
+        #     #                          first_Points3D[0:pts_size, :], normal_map)  # A, B // maps A onto B : B = pose*A
+        #     # print(f'{pts_size} / {first_Points3D.shape[0]}')
+        #     pose = np.dot(previous_pose, pose)
+        #
+        #     cam_pose = pose
+        #     previous_pose = cam_pose
+        #     previous_Points3D = Points3D
         # poses.append(previous_pose)
         # Integrate observation into voxel volume (assume color aligned with depth)
-        tsdf_vol.integrate(color_im, depth_im, cam_intr, cam_pose, obs_weight=1.)
-        iter = iter + 1
+        tsdf_vol.integrate(color_im, depth_im, cam_intr, poses[i], obs_weight=1.)
+        i += 1
 
     joint_ = simple_bundle(joints_3D)
     fig = plt.figure(figsize=(8, 8))
     ax = fig.add_subplot(projection='3d')  # Axe3D object
+    print(joint_.shape)
     ax.scatter(joint_[0, :], joint_[1, :], joint_[2, :]) # projection  P = 4XN
     plt.show()
 
