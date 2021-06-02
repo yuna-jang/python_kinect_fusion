@@ -262,7 +262,9 @@ if __name__ == "__main__":
     fig = plt.figure(figsize=(8, 8))
     ax = fig.add_subplot(projection='3d')  # Axe3D object
     print(joint_.shape)
-    ax.scatter(joint_[0, :], joint_[1, :], joint_[2, :]) # projection  P = 4XN
+    print(joint_)
+    for i in range(17):
+        ax.scatter(joint_[0, i], joint_[1, i], joint_[2, i]) # projection  P = 4XN
     plt.show()
 
     # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
