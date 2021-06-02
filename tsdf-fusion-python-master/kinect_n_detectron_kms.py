@@ -67,7 +67,37 @@ def joint_to_3D(joints, Inverse, depth_im):
         Joints[:, i] = d * np.dot(Inverse, np.array([xx, yy, 1]).T)
     return Joints
 
-# def joint_bundle(joint_3D, poses):
+
+def simple_bundle(joint_3D: list):
+    # Outlier 날리고 평균 구하기.
+    joints_3D = np.array(joint_3D)  # N * 3 * 17
+    joint_val = [[0, 0, 0] for _ in range(17)]
+    counts = [[0.1, 0.1, 0.1] for _ in range(17)]
+    mean = np.mean(joints_3D, axis=0)  # 3x17
+    std = np.std(joints_3D, axis=0)  # 3x17
+    thr_low = mean + 2 * std
+    thr_high = mean - 2 * std
+    for i in range(len(joints_3D)):
+        for j in range(17):
+            if thr_low[0, j] < joints_3D[i, 0, j] < thr_high[0, j]:
+                joint_val[j][0] += joints_3D[i, 0, j]
+                counts[j][0] += 1
+            if thr_low[1, j] < joints_3D[i, 1, j] < thr_high[1, j]:
+                joint_val[j][1] += joints_3D[i, 1, j]
+                counts[j][1] += 1
+            if thr_low[2, j] < joints_3D[i, 2, j] < thr_high[2, j]:
+                joint_val[j][2] += joints_3D[i, 2, j]
+                counts[j][2] += 1
+    result = np.zeros((3, 17))
+    for i, (val, count) in enumerate(zip(joint_val, counts)):
+        xv = val[0]
+        xc = count[0]
+        yv = val[1]
+        yc = count[1]
+        zv = val[2]
+        zc = count[2]
+        result[:, i] = xv / xc, yv / yc, zv / zc
+    return result
 
 
 if __name__ == "__main__":
@@ -129,7 +159,7 @@ if __name__ == "__main__":
             elif iter >= 1:
                 second_Points3D, sample = PointCloud(depth_im, invK)  # Nx3
                 pose = point_to_plane(second_Points3D,
-                                         first_Points3D, prev_normal)  # A, B // maps A onto B : B = pose*A
+                                      first_Points3D, prev_normal)  # A, B // maps A onto B : B = pose*A
                 prev_normal = NormalMap(sample, depth_im, invK)
 
                 # ## visualize pose result
@@ -141,7 +171,6 @@ if __name__ == "__main__":
                 # ax.scatter(P.T[:, 0], P.T[:, 1], P.T[:, 2], color='r', s=0.3)
                 # ax.scatter(first_Points3D[:, 0], first_Points3D[:, 1], first_Points3D[:, 2], color='b', s=0.3) # fP = Nx3
                 # plt.show()
-
 
                 cam_pose = np.dot(first_pose, pose)
 
@@ -163,7 +192,7 @@ if __name__ == "__main__":
     # ===============Integrate===============
     n_imgs = len(list_depth_im)
     iter = 0
-    poses = []
+    # poses = []
     joints_3D = []
 
     for iter in range(0, n_imgs):
@@ -229,19 +258,16 @@ if __name__ == "__main__":
             cam_pose = pose
             previous_pose = cam_pose
             previous_Points3D = Points3D
-        poses.append(previous_pose)
+        # poses.append(previous_pose)
         # Integrate observation into voxel volume (assume color aligned with depth)
         tsdf_vol.integrate(color_im, depth_im, cam_intr, cam_pose, obs_weight=1.)
         iter = iter + 1
 
-    # # Segmentation
-    # for i in range(0, n_imgs):
-    #     print("Human Body Vertex %d/%d" % (i + 1, n_imgs))
-    #     depth_im = list_depth_im[i]
-    #     color_im = list_color_im[i]
-    #
-    #     pose = poses[i]
-    #     human_vol.integrate(color_im, depth_im, cam_intr, pose, obs_weight=1.)
+    joint_ = simple_bundle(joints_3D)
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_subplot(projection='3d')  # Axe3D object
+    ax.scatter(joint_[0, :], joint_[1, :], joint_[2, :]) # projection  P = 4XN
+    plt.show()
 
     # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
     print("Saving mesh")
