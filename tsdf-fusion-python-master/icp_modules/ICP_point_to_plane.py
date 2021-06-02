@@ -61,17 +61,6 @@ def M_matrix(x):
     return M    # 4X4
 
 
-# def R_matrix(x):
-#     R = np.eye(3)
-#     R[0, 1] = -x[2]
-#     R[0, 2] = x[1]
-#     R[1, 0] = x[2]
-#     R[1, 2] = -x[0]
-#     R[2, 0] = -x[1]
-#     R[2, 1] = x[0]
-#     return R    # 3X3
-
-
 def point_to_plane(src, dst, normal, iteration=20):
     """
     src: source 3D point cloud :: Nx3
