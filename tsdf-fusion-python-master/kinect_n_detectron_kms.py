@@ -62,7 +62,7 @@ def filter_joint(output):
 def joint_to_3D(joints, Inverse, depth_im):
     Joints = np.zeros((3, 17))
     for i in range(17):
-        yy, xx = joints[i]
+        xx, yy = joints[i]
         d = depth_im[int(round(yy)), int(round(xx))]
         Joints[:, i] = d * np.dot(Inverse, np.array([xx, yy, 1]).T)
     return Joints

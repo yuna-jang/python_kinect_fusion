@@ -1,10 +1,11 @@
 import time
+import os
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 np.set_printoptions(threshold=np.inf)
-
+import  random
 import fusion
 
 # Kinect module
@@ -13,7 +14,7 @@ from helpers import convert_to_bgra_if_required
 from pyk4a import Config, PyK4A
 from pyk4a import PyK4APlayback
 
-from icp_modules.ICP import *
+# from icp_modules.ICP import *
 from icp_modules.ICP_algorithm import *
 # from icp_modules.ICP_kms import *
 from icp_modules.FramePreprocessing import PointCloud
@@ -38,8 +39,8 @@ if __name__ == "__main__":
 
   # Load video file
   filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\video1.mkv'
-  filename = r'0_sample_video\0531\0531_3.mkv'
-  n_frames = 100
+  filename = r'0_sample_video\yuna2.mkv'
+  n_frames = 20
 
   k4a = PyK4APlayback(filename)
   k4a.open()
@@ -57,13 +58,13 @@ if __name__ == "__main__":
   # while True:
   for i in range(0,n_frames):
       capture = k4a.get_next_capture()
-      if capture.depth is not None and capture.color is not None: #and i%3==0:
+      if capture.depth is not None and capture.color is not None:
         print(f"==========={iter}==========")
 
         # Read depth and color image
         depth_im = capture.transformed_depth.astype(float)
         depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
-        depth_im[depth_im >= 3] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
+        depth_im[depth_im >= 2] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
         color_capture = convert_to_bgra_if_required(k4a.configuration["color_format"], capture.color)
         color_im = cv2.cvtColor(color_capture, cv2.COLOR_BGR2RGB)
 
@@ -109,22 +110,29 @@ if __name__ == "__main__":
   k4a.close()
 
   # ===============Integrate===============
-  n_imgs = len(list_depth_im)
-  iter=0
-  for iter in range(0, n_imgs):
-    print("Fusing frame %d/%d"%(iter+1, n_imgs))
+  dir_data_kinect = 'data_kinect_demo'
+  list_color = os.listdir(dir_data_kinect)
+  list_color_id = [(int)(file.split('_')[0]) for file in list_color if file.endswith("color.jpg")]
+  list_color_id.sort()
+  print(len(list_color_id))
+
+
+  n_imgs = len(list_color_im)
+  # for i, val in enumerate(list_color_id):
+  for i in range(0,n_imgs):
+    print("Fusing frame %d/%d"%(i+1, n_imgs))
 
     # Read depth and color image
-    depth_im = list_depth_im[iter]
-    color_im = list_color_im[iter]
+    depth_im = list_depth_im[i]
+    color_im = list_color_im[i]
 
     # Set first frame as world system
-    if iter == 0:
+    if i == 0:
       previous_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
       cam_pose = np.eye(4)
       previous_pose = cam_pose
 
-    elif iter >= 1:
+    elif i >= 1:
       Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
 
       # Compute camera view frustum and extend convex hull
@@ -156,15 +164,12 @@ if __name__ == "__main__":
       # ax.scatter(second_Points3D[samples_second, 0], second_Points3D[samples_second, 1], second_Points3D[samples_second, 2], color='r', s=0.3)
       # ax.scatter(first_Points3D[samples_first, 0], first_Points3D[samples_first, 1], first_Points3D[samples_first, 2], color='b', s=0.3)
       # plt.show()
-      #
+
       # # pose matrix 검증
       # fig = plt.figure(figsize=(8, 8))
       # ax = fig.add_subplot(projection='3d')  # Axe3D object
       # P = np.vstack((second_Points3D.T, np.ones((1, second_Points3D.T.shape[1]))))  # projection
       # proj = np.dot(pose_real, P)
-      # # ax.scatter(P.T[samples, 0], P.T[samples, 1], P.T[samples, 2], color='r', s=0.3)
-      # # ax.scatter(proj.T[samples, 0], proj.T[samples, 1], proj.T[samples, 2], color='g', s=0.3)
-      # # ax.scatter(first_Points3D[samples, 0], first_Points3D[samples, 1], first_Points3D[samples, 2], color='b', s=0.3)
       # ax.scatter(proj.T[:, 0], proj.T[:, 1], proj.T[:, 2], color='g', s=0.3)
       # ax.scatter(first_Points3D[:, 0], first_Points3D[:, 1], first_Points3D[:, 2], color='b', s=0.3)
       # plt.show()
@@ -174,8 +179,7 @@ if __name__ == "__main__":
       previous_Points3D = Points3D
 
     # Integrate observation into voxel volume (assume color aligned with depth)
-    tsdf_vol.integrate(color_im, depth_im, cam_intr, cam_pose, obs_weight=1.)
-    iter=iter+1
+    tsdf_vol.integrate(color_im, depth_im, cam_intr, cam_pose, obs_weight=0.1)
 
 
   # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
