@@ -60,7 +60,7 @@ if __name__ == "__main__":
     # Load video file
     filename = r'0_sample_video\yuna2.mkv'
 
-    n_frames = 20
+    n_frames = 50
 
     k4a = PyK4APlayback(filename)
     k4a.open()
@@ -75,7 +75,9 @@ if __name__ == "__main__":
     vol_bnds = np.zeros((3, 2))
     voxel_size = 0.01
     iter = 0
-    # while True:
+
+    # for k in range(100):
+    #     k4a.get_next_capture()
     for i in range(0, n_frames):
         capture = k4a.get_next_capture()
         if capture.depth is not None and capture.color is not None: #and i%2==0:
@@ -114,8 +116,7 @@ if __name__ == "__main__":
             elif iter >= 1:
                 second_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
                 ind = random.sample(range(first_Points3D.shape[1]), second_Points3D.shape[1])
-                pose, distances, _ = icp(second_Points3D.T,
-                                         first_Points3D.T[ind, :])  # A, B // maps A onto B : B = pose*A
+                pose, _ = icp(second_Points3D.T,first_Points3D.T[ind, :])  # A, B // maps A onto B : B = pose*A
                 cam_pose = np.dot(first_pose, pose)
 
                 first_pose = cam_pose
@@ -154,7 +155,7 @@ if __name__ == "__main__":
             Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
 
             # Compute camera view frustum and extend convex hull
-            pose, distances, _ = icp(Points3D.T, previous_Points3D.T)  # A, B // maps A onto B : B = pose*A
+            pose, _ = icp(Points3D.T, previous_Points3D.T)  # A, B // maps A onto B : B = pose*A
             pose = np.dot(previous_pose, pose)
 
             view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, pose)
@@ -166,46 +167,26 @@ if __name__ == "__main__":
             second_Points3D = tsdf_vol_seq.get_point_cloud()[:, 0:3]
 
             # 누적 pointcloud vertex only
-            # first_Points3D = tsdf_vol.get_partial_point_cloud()
             first_Points3D = tsdf_vol.get_point_cloud()[:, 0:3]
 
             pts_size = min(first_Points3D.shape[0], second_Points3D.shape[0])
             size = min(pts_size, 30000)
+
             samples_first = random.sample(range(first_Points3D.shape[0]), size)
             samples_second = random.sample(range(second_Points3D.shape[0]), size)
-            pose_real, _, _ = icp(second_Points3D[samples_second, :],first_Points3D[samples_first, :])  # A, B // maps A onto B : B = pose*A
+            pose_real, mean_error = icp(second_Points3D[samples_second, :],first_Points3D[samples_first, :])  # A, B // maps A onto B : B = pose*A
+            print(f'icp stop : {mean_error}')
+
             pose_real = np.dot(previous_pose, pose_real)
 
             cam_pose = pose_real
             previous_pose = cam_pose
             previous_Points3D = Points3D
-        # poses.append(previous_pose)
+
         # Integrate observation into voxel volume (assume color aligned with depth)
         tsdf_vol.integrate(color_im, depth_im, cam_intr, cam_pose, obs_weight=1.)
         iter = iter + 1
 
-    # # Segmentation
-    # for i in range(0, n_imgs):
-    #     print("Human Body Vertex %d/%d" % (i + 1, n_imgs))
-    #     depth_im = list_depth_im[i]
-    #     color_im = list_color_im[i]
-    #     output = model(color_im)
-    #     # visualization
-    #     # v = Visualizer(color_im[:, :, ::-1], MetadataCatalog.get(model.cfg.DATASETS.TRAIN[0]), scale=1.2)
-    #     # v = v.draw_instance_predictions(output["instances"].to("cpu"))
-    #     # cv2.imwrite(rf'0_sample_video\data_detectron\{i}_orig.jpg',color_im)
-    #     # cv2.imwrite(rf'0_sample_video\data_detectron\{i}_seg.jpg',v.get_image()[:,:,::-1])
-    #     not_valid_x, not_valid_y = filter_human(output)
-    #     for not_x, not_y in zip(not_valid_x, not_valid_y):
-    #         depth_im[not_x, not_y] = 0
-    #         color_im[not_x, not_y] = 0
-    #     print('Depth info')
-    #     val_x, val_y = np.nonzero(depth_im)
-    #
-    #     threshold = np.mean(depth_im[val_x, val_y]) + 2 * np.std(depth_im[val_x, val_y])
-    #     depth_im[depth_im >= threshold] = 0
-    #     pose = poses[i]
-    #     human_vol.integrate(color_im, depth_im, cam_intr, pose, obs_weight=1.)
 
     # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
     print("Saving mesh")

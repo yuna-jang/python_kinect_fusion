@@ -65,7 +65,7 @@ def nearest_neighbor(src, dst):
     return distances.ravel(), indices.ravel()
 
 
-def icp(A, B, init_pose=None, max_iterations=30, tolerance=0.0000001):
+def icp(A, B, init_pose=None, max_iterations=30, tolerance=0.000001):
     '''
     The Iterative Closest Point method: finds best-fit transform that maps points A on to points B
     Input:
@@ -101,21 +101,33 @@ def icp(A, B, init_pose=None, max_iterations=30, tolerance=0.0000001):
         # find the nearest neighbors between the current source and destination points
         distances, indices = nearest_neighbor(src[:m,:].T, dst[:m,:].T)
 
+        # filtering out long distance pairs
+        median_error = np.median(distances)
+        sample_src = []
+        sample_dst = []
+        sample_distance = []
+        for j in range(len(indices)):
+            if distances[j] < median_error:
+                sample_src.append(j)
+                sample_dst.append(indices[j])
+                sample_distance.append(distances[j])
+
         # compute the transformation between the current source and nearest destination points
-        T,_,_ = best_fit_transform(src[:m,:].T, dst[:m,indices].T)
+        # T,_,_ = best_fit_transform(src[:m,:].T, dst[:m,indices].T)
+        T,_,_ = best_fit_transform(src[:m,sample_src].T, dst[:m,sample_dst].T)
+
 
         # update the current source
         src = np.dot(T, src)
 
         # check error
-        mean_error = np.mean(distances)
+        mean_error = np.mean(sample_distance)
         if np.abs(prev_error - mean_error) < tolerance:
+            print(f'iter icp : {i}')
             break
         prev_error = mean_error
-    print(f'icp stop : {mean_error}')
-    print('--------------------------')
 
     # calculate final transformation
     T,_,_ = best_fit_transform(A, src[:m,:].T)
 
-    return T, distances, i
+    return T, mean_error
