@@ -60,6 +60,7 @@ def Joint_model():
 
 def joint_to_3D(joints, Inverse, pose, depth_im):
     Joints = np.zeros((3, 17))
+    # invPose = np.linalg.inv(pose)
     for i in range(17):
         xx, yy = joints[i]
         d = depth_im[int(round(yy)), int(round(xx))]
@@ -104,6 +105,18 @@ def simple_bundle(joint_3D: list):
     return result
 
 
+def coordinate_transfer(vol_bnd, joint_val):
+    print('vol_bnd', vol_bnd)
+    vol_max = np.max(vol_bnd, axis=1)
+    vol_min = np.min(vol_bnd, axis=1)
+    joint_max = np.max(vol_bnd, axis=1)
+    joint_min = np.min(vol_bnd, axis=1)
+    print(joint_max, joint_min)
+    for i in range(17):
+        joint_val[:, i] = (joint_val[:, i] - joint_min) / (joint_max - joint_min) * (vol_max - vol_min) + vol_min
+    return joint_val
+
+
 if __name__ == "__main__":
     model = SEG_model()
     joint_model = Joint_model()
@@ -120,7 +133,7 @@ if __name__ == "__main__":
     # Load video file
     # filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\video1.mkv'
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\human6.mkv'
-    n_frames = 30
+    n_frames = 4
 
 
     k4a = PyK4APlayback(filename)
@@ -258,6 +271,7 @@ if __name__ == "__main__":
     #     pose = poses[i]
     #     human_vol.integrate(color_im, depth_im, cam_intr, pose, obs_weight=1.)
     joint_ = simple_bundle(joints_3D)
+    mesh_joint = coordinate_transfer(vol_bnd=vol_bnds, joint_val=joint_)
     fig = plt.figure(figsize=(8, 8))
     ax = fig.add_subplot(projection='3d')  # Axe3D object
     print(joint_.shape)
@@ -267,17 +281,21 @@ if __name__ == "__main__":
                   'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
                   'left_knee', 'right_knee', 'left_ankle', 'right_ankle']
 
-    for i in range(17):
-        ax.scatter(joint_[0, i], joint_[1, i], joint_[2, i]) # projection  P = 4XN
-        ax.text(joint_[0, i], joint_[1, i], joint_[2, i], joint_info[i], fontsize=10)
-    plt.show()
+
 
     # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
     print("Saving mesh")
     # verts, faces, norms, colors = human_vol.get_mesh()
     verts, faces, norms, colors = tsdf_vol.get_mesh()
     fusion.meshwrite("human_mesh.ply", verts, faces, norms, colors)
+    verts_ = verts.T
 
+    for i in range(17):
+        ax.scatter(mesh_joint[0, i], mesh_joint[1, i], mesh_joint[2, i], c='magenta') # projection  P = 4XN
+        ax.text(mesh_joint[0, i], mesh_joint[1, i], mesh_joint[2, i], joint_info[i], fontsize=10)
+    for j in range(len(verts)):
+        ax.scatter(verts_[0, j], verts_[1, j], verts_[2, j], c='bluerk')
+    plt.show()
     # Get point cloud from voxel volume and save to disk (can be viewed with Meshlab)
     # print("Saving point cloud")
     # point_cloud = human_vol.get_point_cloud()
