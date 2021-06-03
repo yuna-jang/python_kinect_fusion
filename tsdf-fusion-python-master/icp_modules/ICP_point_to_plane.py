@@ -69,6 +69,7 @@ def point_to_plane(src, dst, normal, iteration=20):
     """
     # N = min(src.shape[0], dst.shape[0])
     # size = min(src.shape[0], dst.shape[0], 50000)
+    print(src.shape, dst.shape, normal.shape)
     batch = 20
 
     T_history = []
