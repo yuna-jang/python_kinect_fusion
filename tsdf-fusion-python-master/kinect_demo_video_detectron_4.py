@@ -135,11 +135,30 @@ def Joint_model():
 #         joint_val[:, i] = (joint_val[:, i] - joint_min) / (joint_max - joint_min) * (vol_max - vol_min) + vol_min
 #     return joint_val
 
+def panoptic_model():
+    cfg = get_cfg()
+    cfg.merge_from_file(model_zoo.get_config_file("COCO-PanopticSegmentation/panoptic_fpn_R_101_3x.yaml"))
+    cfg.MODEL.DEVICE = 'cpu'
+    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-PanopticSegmentation/panoptic_fpn_R_101_3x.yaml")
+    predictor = DefaultPredictor(cfg)
+    return predictor
+
+
+def human_masking(p_model, color_image, depth_image):
+    panoptic_seg, segments_info = p_model(color_image)["panoptic_seg"]
+    panop = panoptic_seg.numpy()
+    panop[panop != 1] = 0
+    panop_3 = np.array([panop, panop, panop])
+    panop_3 = panop_3.transpose(1, 2, 0)
+    masked_color = np.multiply(color_image, panop_3)
+    masked_depth = np.multiply(depth_image, panop)
+    return masked_color, masked_depth
+
 
 if __name__ == "__main__":
     model = SEG_model()
     joint_model = Joint_model()
-
+    panoptic = panoptic_model()
     # Open kinect camera by realtime
     k4a = PyK4A(
         Config(
@@ -152,7 +171,7 @@ if __name__ == "__main__":
     # Load video file
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\yuna2.mkv'
 
-    n_frames = 5
+    n_frames = 40
 
     k4a = PyK4APlayback(filename)
     k4a.open()
@@ -165,7 +184,7 @@ if __name__ == "__main__":
     list_color_im = []
     # vol_bnds 생성
     vol_bnds = np.zeros((3, 2))
-    voxel_size = 0.01
+    voxel_size = 0.02
     iter = 0
     # while True:
     for i in range(0, n_frames):
@@ -189,12 +208,13 @@ if __name__ == "__main__":
                                      [-1, -1, -1, -1, -1]]) / 9.0
             color_im = cv2.filter2D(color_im, -1, sharpening_2)
 
-            # Segmentaion human
-            output = model(color_im)
-            not_valid_x, not_valid_y = filter_human(output)
-            for not_x, not_y in zip(not_valid_x, not_valid_y):
-                depth_im[not_x, not_y] = 0
-                color_im[not_x, not_y] = 0
+            # # Segmentaion human
+            # output = model(color_im)
+            # not_valid_x, not_valid_y = filter_human(output)
+            # for not_x, not_y in zip(not_valid_x, not_valid_y):
+            #     depth_im[not_x, not_y] = 0
+            #     color_im[not_x, not_y] = 0
+            color_im, depth_im = human_masking(panoptic, color_im, depth_im)
 
             list_depth_im.append(depth_im)
             list_color_im.append(color_im)
@@ -275,10 +295,10 @@ if __name__ == "__main__":
             previous_pose = cam_pose
             previous_Points3D = Points3D
 
-            output = joint_model(color_im)
-            joints, color_filtered, depth_filtered = filter_joint(output, color_im, depth_im)
-            for vol, color_, depth_ in zip(joints_vols, color_filtered, depth_filtered):
-                vol.integrate(color_, depth_, cam_intr, cam_pose, obs_weight=1.)
+            # output = joint_model(color_im)
+            # joints, color_filtered, depth_filtered = filter_joint(output, color_im, depth_im)
+            # for vol, color_, depth_ in zip(joints_vols, color_filtered, depth_filtered):
+            #     vol.integrate(color_, depth_, cam_intr, cam_pose, obs_weight=1.)
 
             # joints_3D.append(joint_to_3D(joint, np.linalg.inv(cam_intr), cam_pose, depth_im))
 
@@ -287,14 +307,8 @@ if __name__ == "__main__":
         tsdf_vol.integrate(color_im, depth_im, cam_intr, cam_pose, obs_weight=1.)
         iter = iter + 1
 
-    # joint_ = simple_bundle(joints_3D)
-    # mesh_joint = coordinate_transfer(vol_bnd=vol_bnds, joint_val=joint_)
     fig = plt.figure(figsize=(8, 8))
     ax = fig.add_subplot(projection='3d')  # Axe3D object
-    # print(joint_.shape)
-    # print(joint_)
-    mesh_joint = vol_to_joint(joints_vols)
-    # print(joint_result)
     joint_info = ['nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear', 'left_shoulder', 'right_shoulder',
                   'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
                   'left_knee', 'right_knee', 'left_ankle', 'right_ankle']
@@ -326,18 +340,18 @@ if __name__ == "__main__":
     print("Saving mesh")
     verts, faces, norms, colors = tsdf_vol.get_mesh()
     # verts, faces, norms, colors = tsdf_vol.get_mesh()
-    fusion.meshwrite("human_mesh_seg.ply", verts, faces, norms, colors)
+    fusion.meshwrite("human_mesh_seg_4.ply", verts, faces, norms, colors)
 
     verts_ = verts.T
 
-    for i in range(17):
-        ax.scatter(mesh_joint[0, i], mesh_joint[1, i], mesh_joint[2, i], c='magenta') # projection  P = 4XN
-        ax.text(mesh_joint[0, i], mesh_joint[1, i], mesh_joint[2, i], joint_info[i], fontsize=10)
+    # for i in range(17):
+    #     ax.scatter(mesh_joint[0, i], mesh_joint[1, i], mesh_joint[2, i], c='magenta') # projection  P = 4XN
+    #     ax.text(mesh_joint[0, i], mesh_joint[1, i], mesh_joint[2, i], joint_info[i], fontsize=10)
     for j in range(int(len(verts) / 3)):
         ax.scatter(verts_[0, 3* j], verts_[1, 3*j], verts_[2, 3*j], c='blue')
     plt.show()
 
-    # Get point cloud from voxel volume and save to disk (can be viewed with Meshlab)
-    print("Saving point cloud")
-    point_cloud = tsdf_vol.get_point_cloud()
-    fusion.pcwrite("human_pcd_seg.ply", point_cloud)
+    # # Get point cloud from voxel volume and save to disk (can be viewed with Meshlab)
+    # print("Saving point cloud")
+    # point_cloud = tsdf_vol.get_point_cloud()
+    # fusion.pcwrite("human_pcd_seg_4.ply", point_cloud)
