@@ -90,52 +90,6 @@ def Joint_model():
     return predictor
 
 
-# def joint_to_3D(joints, Inverse, pose, depth_im):
-#     Joints = np.zeros((3, 17))
-#     # invPose = np.linalg.inv(pose)
-#     for i in range(17):
-#         xx, yy = joints[i]
-#         d = depth_im[int(round(yy)), int(round(xx))]
-#         U = d * np.dot(Inverse, np.array([xx, yy, 1]).T)    # 3X1
-#         Joints[:, i] = np.dot(pose, np.array([U[0], U[1], U[2], 1]))[:-1]   # [4x4 @ 4x1][0, 1, 2]
-#     return Joints   # 3x17
-
-#
-#
-# def simple_bundle(joint_3D: list):
-#     # Outlier 날리고 평균 구하기.
-#     joints_3D = np.array(joint_3D)  # N * 3 * 17
-#     if len(joint_3D) > 20:
-#         m = np.mean(joints_3D, axis=0)
-#         s = np.std(joints_3D, axis=0)
-#         thr = m + 2*s
-#         thr2 = m - 2*s
-#         vals = np.zeros((3, 17))
-#         count = np.zeros((3, 17))
-#         for i in range(len(joints_3D)):
-#             for k in range(3):
-#                 for j in range(17):
-#                     if thr2[k, j] <= joints_3D[i, k, j] <= thr[k, j]:
-#                         vals[k, j] += joints_3D[i, k, j]
-#                         count[k, j] += 1
-#         result = vals / count
-#     else:
-#         result = np.mean(joints_3D, axis=0)
-#     return result
-#
-#
-# def coordinate_transfer(vol_bnd, joint_val):
-#     print('vol_bnd', vol_bnd)
-#     vol_max = np.max(vol_bnd, axis=1)
-#     vol_min = np.min(vol_bnd, axis=1)
-#     joint_max = np.max(vol_bnd, axis=1)
-#     joint_min = np.min(vol_bnd, axis=1)
-#     print(joint_max, joint_min)
-#     for i in range(17):
-#         joint_val[:, i] = (joint_val[:, i] - joint_min) / (joint_max - joint_min) * (vol_max - vol_min) + vol_min
-#     return joint_val
-
-
 if __name__ == "__main__":
     model = SEG_model()
     joint_model = Joint_model()
@@ -151,8 +105,9 @@ if __name__ == "__main__":
 
     # Load video file
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\yuna2.mkv'
+    filename = r'0_sample_video\yuna2.mkv'
 
-    n_frames = 40
+    n_frames = 20
 
     k4a = PyK4APlayback(filename)
     k4a.open()

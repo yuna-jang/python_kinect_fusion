@@ -11,7 +11,7 @@ import pyk4a
 from helpers import convert_to_bgra_if_required
 from pyk4a import Config, PyK4A
 from pyk4a import PyK4APlayback
-from icp_modules.ICP import *
+from icp_modules.ICP_algorithm import *
 from icp_modules.FramePreprocessing import PointCloud
 from helpers import colorize, convert_to_bgra_if_required
 from detectron2 import model_zoo
@@ -171,8 +171,9 @@ if __name__ == "__main__":
 
     # Load video file
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\0531_3.mkv'
+    filename = r'0_sample_video\yuna2.mkv'
 
-    n_frames = 6
+    n_frames = 20
 
     k4a = PyK4APlayback(filename)
     k4a.open()
@@ -185,7 +186,7 @@ if __name__ == "__main__":
     list_color_im = []
     # vol_bnds 생성
     vol_bnds = np.zeros((3, 2))
-    voxel_size = 0.02
+    voxel_size = 0.01
     iter = 0
     poses = []
     # while True:
