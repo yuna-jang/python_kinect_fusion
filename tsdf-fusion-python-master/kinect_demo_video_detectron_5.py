@@ -155,20 +155,6 @@ def human_masking(p_model, color_image, depth_image):
     return masked_color, masked_depth
 
 
-# def background_info(p_model, color_image):
-#     panoptic_seg, segments_info = p_model(color_image)["panoptic_seg"]
-#     back = panoptic_seg.numpy()
-#     back[back != 5] = 0
-#     back = np.array([back, back, back])
-#     only_back = np.multiply(color_image, back)
-#     green = np.sum(only_back.reshape(-1, 3), axis=0) / np.sum(back.reshape(-1, 3), axis=0)
-#     return green
-
-#
-# # segmentation 결과 중에초록색 제거하는거 넣고싶은데 어떻게할까
-# def background_filter(low, high, filtered_color):
-#     h, w, _ = filtered_color.shape
-
 
 if __name__ == "__main__":
     model = SEG_model()
@@ -186,7 +172,7 @@ if __name__ == "__main__":
     # Load video file
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\yuna2.mkv'
 
-    n_frames = 200
+    n_frames = 4
 
     k4a = PyK4APlayback(filename)
     k4a.open()
@@ -215,6 +201,8 @@ if __name__ == "__main__":
             color_capture = convert_to_bgra_if_required(k4a.configuration["color_format"], capture.color)
             color_im = cv2.cvtColor(color_capture, cv2.COLOR_BGR2RGB)
 
+            # cv2.imshow('mask', depth_mask)
+            # cv2.waitKey(0)
             filtered_depth = cv2.bilateralFilter(depth_im.astype(np.float32), 5, 35, 35)
             color_im = cv2.bilateralFilter(color_im, 10, 50, 50)
             sharpening_2 = np.array([[-1, -1, -1, -1, -1],
@@ -224,14 +212,16 @@ if __name__ == "__main__":
                                      [-1, -1, -1, -1, -1]]) / 9.0
             color_im = cv2.filter2D(color_im, -1, sharpening_2)
 
-            # # Segmentaion human
-            # output = model(color_im)
-            # not_valid_x, not_valid_y = filter_human(output)
-            # for not_x, not_y in zip(not_valid_x, not_valid_y):
-            #     depth_im[not_x, not_y] = 0
-            #     color_im[not_x, not_y] = 0
-            color_im, depth_im = human_masking(panoptic, color_im, depth_im)
+            color, depth = human_masking(panoptic, color_im, depth_im)
+            depth_mask = depth.copy()
+            depth_mask[depth_mask != 0] = 1
+            depth_mask = np.array([depth_mask, depth_mask, depth_mask]).transpose(1, 2, 0)
 
+            color_im = np.multiply(color, depth_mask)
+            cv2.imshow('b', color.astype(np.uint8))
+            cv2.imshow('m', depth_mask)
+            cv2.imshow('c', color_im)
+            cv2.waitKey(0)
             list_depth_im.append(depth_im)
             list_color_im.append(color_im)
 
@@ -363,9 +353,9 @@ if __name__ == "__main__":
     # for i in range(17):
     #     ax.scatter(mesh_joint[0, i], mesh_joint[1, i], mesh_joint[2, i], c='magenta') # projection  P = 4XN
     #     ax.text(mesh_joint[0, i], mesh_joint[1, i], mesh_joint[2, i], joint_info[i], fontsize=10)
-    for j in range(int(len(verts) / 3)):
-        ax.scatter(verts_[0, 3* j], verts_[1, 3*j], verts_[2, 3*j], c='blue')
-    plt.show()
+    # for j in range(int(len(verts) / 3)):
+    #     ax.scatter(verts_[0, 3* j], verts_[1, 3*j], verts_[2, 3*j], c='blue')
+    # plt.show()
 
     # # Get point cloud from voxel volume and save to disk (can be viewed with Meshlab)
     # print("Saving point cloud")
