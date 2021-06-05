@@ -11,7 +11,7 @@ import pyk4a
 from helpers import convert_to_bgra_if_required
 from pyk4a import Config, PyK4A
 from pyk4a import PyK4APlayback
-from icp_modules.ICP_algorithm import *
+from icp_modules.ICP import *
 from icp_modules.FramePreprocessing import PointCloud
 from helpers import colorize, convert_to_bgra_if_required
 from detectron2 import model_zoo
@@ -184,7 +184,7 @@ if __name__ == "__main__":
     )
 
     # Load video file
-    filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\yuna2.mkv'
+    filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\0531_3.mkv'
 
     n_frames = 200
 
@@ -356,7 +356,7 @@ if __name__ == "__main__":
     print("Saving mesh")
     verts, faces, norms, colors = tsdf_vol.get_mesh()
     # verts, faces, norms, colors = tsdf_vol.get_mesh()
-    fusion.meshwrite("human_mesh_seg_4.ply", verts, faces, norms, colors)
+    fusion.meshwrite("human_mesh_seg_0531.ply", verts, faces, norms, colors)
 
     verts_ = verts.T
 

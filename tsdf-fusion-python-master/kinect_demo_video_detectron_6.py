@@ -172,7 +172,7 @@ if __name__ == "__main__":
     # Load video file
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\0531_3.mkv'
 
-    n_frames = 30
+    n_frames = 6
 
     k4a = PyK4APlayback(filename)
     k4a.open()
@@ -219,11 +219,6 @@ if __name__ == "__main__":
             depth_mask = np.array([depth_mask, depth_mask, depth_mask]).transpose(1, 2, 0)
 
             color_im = np.multiply(color.astype(np.uint8), depth_mask.astype(np.uint8))
-            # cv2.imshow('b', color.astype(np.uint8))
-            # cv2.imshow('m', depth_mask)
-            # cv2.imshow('c', color_im)
-            # cv2.imshow('d', depth_im)
-            # cv2.waitKey(0)
             list_depth_im.append(depth_im)
             list_color_im.append(color_im)
 
@@ -265,8 +260,8 @@ if __name__ == "__main__":
         # Read depth and color image
         depth_im = list_depth_im[iter]
         color_im = list_color_im[iter]
-        cam_pose = poses[iter]
-        tsdf_vol.integrate(color_im, depth_im, cam_intr, cam_pose, obs_weight=1.)
+        pose = poses[iter]
+        tsdf_vol.integrate(color_im, depth_im, cam_intr, pose, obs_weight=1.)
         iter = iter + 1
         # Set first frame as world system
         # if iter == 0:
@@ -348,7 +343,7 @@ if __name__ == "__main__":
     print("Saving mesh")
     verts, faces, norms, colors = tsdf_vol.get_mesh()
     # verts, faces, norms, colors = tsdf_vol.get_mesh()
-    fusion.meshwrite("human_mesh_seg_5.ply", verts, faces, norms, colors)
+    fusion.meshwrite("human_mesh_seg_6.ply", verts, faces, norms, colors)
 
     verts_ = verts.T
 

@@ -98,52 +98,45 @@ def icp(A, B, init_pose=None, max_iterations=50, tolerance=1e-7):
     m = A.shape[1]
     N = min(A.shape[0], B.shape[0])
     size = min(A.shape[0], B.shape[0])
-    o_size = size
-    batch = 20
-    batch_tolerance = 1e-9
-    batch_error = []
+    # o_size = size
+    # batch = 20
+    # batch_tolerance = 1e-9
+    # batch_error = []
     # make points homogeneous, copy them to maintain the originals
-    for b in range(batch):
-        src = np.ones((m+1, size))
-        dst = np.ones((m+1, size))
-        sampler = random.sample(range(N), size)
-        src[:m, :] = np.copy(A[sampler, :].T)
-        dst[:m, :] = np.copy(B[sampler, :].T)
+    # for b in range(batch):
+    src = np.ones((m+1, size))
+    dst = np.ones((m+1, size))
+    sampler = random.sample(range(N), size)
+    src[:m, :] = np.copy(A[sampler, :].T)
+    dst[:m, :] = np.copy(B[sampler, :].T)
 
-        # apply the initial pose estimation
-        if init_pose is not None:
-            src = np.dot(init_pose, src)
+    # apply the initial pose estimation
+    if init_pose is not None:
+        src = np.dot(init_pose, src)
 
-        prev_error = 0
+    prev_error = 0
 
-        for i in range(max_iterations):
-            # find the nearest neighbors between the current source and destination points
-            # src = np.nan_to_num(src)
-            # dst = np.nan_to_num(dst)
-            distances, indices = nearest_neighbor(src[:m, :].T, dst[:m,:].T)
-            # src = np.nan_to_num(src)
-            # dst = np.nan_to_num(dst)
+    for i in range(max_iterations):
+        # find the nearest neighbors between the current source and destination points
+        src = np.nan_to_num(src)
+        dst = np.nan_to_num(dst)
+        distances, indices = nearest_neighbor(src[:m, :].T, dst[:m,:].T)
+        src = np.nan_to_num(src)
+        dst = np.nan_to_num(dst)
 
-            T, _, _, s = best_fit_transform(src[:m, :].T, dst[:m, indices].T)
+        T, _, _, s = best_fit_transform(src[:m, :].T, dst[:m, indices].T)
 
-            # update the current source
-            src = T.dot(src) * s
-            A = (T.dot(np.vstack((A.T, np.ones((1, len(A)))))) * s)[:-1, :].T
-            # check error
-            mean_error = np.mean(distances)
-            if np.abs(prev_error - mean_error) < tolerance:
-                print('Error', b, mean_error)
-                break
-            prev_error = mean_error
-        batch_error.append(mean_error)
-        if len(batch_error) > 2:
-            if batch_error[-2] - batch_error[-1] < batch_tolerance:
-                break
-            if batch_error[-2] < batch_error[-1]:
-                break
-    sampler = random.sample(range(N), o_size)
-    # print(A[sampler, :].shape, B[sampler, :].shape)
-    T, _, _, s = best_fit_transform(A[sampler, :], B[sampler, :])
+        # update the current source
+        src = T.dot(src) * s
+        # check error
+        mean_error = np.mean(distances)
+        if np.abs(prev_error - mean_error) < tolerance:
+            print('Error', mean_error)
+            break
+        prev_error = mean_error
+    A = np.nan_to_num(A)
+    src = np.nan_to_num(src)
+    T, _, _, s = best_fit_transform(A[sampler, :], src[:m, :].T)
     return T, distances, i
 
 

@@ -11,7 +11,7 @@ import pyk4a
 from helpers import convert_to_bgra_if_required
 from pyk4a import Config, PyK4A
 from pyk4a import PyK4APlayback
-from icp_modules.ICP import *
+from icp_modules.ICP_algorithm import *
 from icp_modules.FramePreprocessing import PointCloud
 from helpers import colorize, convert_to_bgra_if_required
 from detectron2 import model_zoo
@@ -172,7 +172,7 @@ if __name__ == "__main__":
     # Load video file
     filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\0531_3.mkv'
 
-    n_frames = 30
+    n_frames = 20
 
     k4a = PyK4APlayback(filename)
     k4a.open()
@@ -185,7 +185,7 @@ if __name__ == "__main__":
     list_color_im = []
     # vol_bnds 생성
     vol_bnds = np.zeros((3, 2))
-    voxel_size = 0.02
+    voxel_size = 0.01
     iter = 0
     backgrounds = []
     # while True:
@@ -197,7 +197,7 @@ if __name__ == "__main__":
             # Read depth and color image
             depth_im = capture.transformed_depth.astype(float)
             depth_im /= 1000.  ## depth is saved in 16-bit PNG in millimeters
-            depth_im[depth_im >= 1.9] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
+            depth_im[depth_im >= 2.5] = 0  # set invalid depth to 0 (specific to 7-scenes dataset) 65.535=2^16/1000
             color_capture = convert_to_bgra_if_required(k4a.configuration["color_format"], capture.color)
             color_im = cv2.cvtColor(color_capture, cv2.COLOR_BGR2RGB)
 
@@ -257,8 +257,8 @@ if __name__ == "__main__":
     # ===============Integrate===============
     n_imgs = len(list_depth_im)
     iter = 0
-    joints_3D = []
-    joints_vols = [fusion.TSDFVolume(vol_bnds, voxel_size=voxel_size) for i in range(17)]
+    # joints_3D = []
+    # joints_vols = [fusion.TSDFVolume(vol_bnds, voxel_size=voxel_size) for i in range(17)]
     for iter in range(0, n_imgs):
         print("Fusing frame %d/%d" % (iter + 1, n_imgs))
 
