@@ -77,7 +77,7 @@ def nearest_neighbor(src, dst):
 
 
 
-def icp(A, B, init_pose=None, max_iterations=50, tolerance=0.0001):
+def icp(A, B, init_pose=None, max_iterations=50, tolerance=1e-7):
     '''
     The Iterative Closest Point method: finds best-fit transform that maps points A on to points B
     Input:
@@ -95,64 +95,55 @@ def icp(A, B, init_pose=None, max_iterations=50, tolerance=0.0001):
     '''
     # print(A.shape, B.shape)
     assert A.shape == B.shape
-    # select Nonzero(=outlier)
-    Ao = A.shape[0]
-    Bo = B.shape[0]
-    # nonA = np.nonzero(np.sum(A, axis=1))
-    # nonB = np.nonzero(np.sum(B, axis=1))
-    # A = A[nonA, :]  # 3xn
-    # B = B[nonB, :]  # 3xn
-    # A = np.squeeze(A)
-    # B = np.squeeze(B)
-    # get number of dimensions
-    # print('=======ICP=======')
-    # print(A.shape)
-    # print(B.shape)
-    # print('=================')
     m = A.shape[1]
     N = min(A.shape[0], B.shape[0])
     size = min(A.shape[0], B.shape[0])
-    sampler = random.sample(range(N), size)
-
+    o_size = size
+    batch = 20
+    batch_tolerance = 1e-9
+    batch_error = []
     # make points homogeneous, copy them to maintain the originals
-    src = np.ones((m+1, size))
-    dst = np.ones((m+1, size))
-    src[:m, :] = np.copy(A[sampler, :].T)
-    dst[:m, :] = np.copy(B[sampler, :].T)
+    for b in range(batch):
+        src = np.ones((m+1, size))
+        dst = np.ones((m+1, size))
+        sampler = random.sample(range(N), size)
+        src[:m, :] = np.copy(A[sampler, :].T)
+        dst[:m, :] = np.copy(B[sampler, :].T)
 
-    # apply the initial pose estimation
-    if init_pose is not None:
-        src = np.dot(init_pose, src)
+        # apply the initial pose estimation
+        if init_pose is not None:
+            src = np.dot(init_pose, src)
 
-    prev_error = 0
+        prev_error = 0
 
-    for i in range(max_iterations):
-        # find the nearest neighbors between the current source and destination points
-        # src = np.nan_to_num(src)
-        # dst = np.nan_to_num(dst)
-        distances, indices = nearest_neighbor(src[:m, :].T, dst[:m,:].T)
-        # src = np.nan_to_num(src)
-        # dst = np.nan_to_num(dst)
+        for i in range(max_iterations):
+            # find the nearest neighbors between the current source and destination points
+            # src = np.nan_to_num(src)
+            # dst = np.nan_to_num(dst)
+            distances, indices = nearest_neighbor(src[:m, :].T, dst[:m,:].T)
+            # src = np.nan_to_num(src)
+            # dst = np.nan_to_num(dst)
 
-        # compute the transformation between the current source and nearest destination points
-        # T, _, _ = best_fit_transform(src[:m,:].T, dst[:m,indices].T)
-        T, _, _, s = best_fit_transform(src[:m, :].T, dst[:m, indices].T)
+            T, _, _, s = best_fit_transform(src[:m, :].T, dst[:m, indices].T)
 
-        # update the current source
-        src = T.dot(src) * s
-        # # update the current source
-        # src = np.dot(T, src)
-        # check error
-        mean_error = np.mean(distances)
-        if np.abs(prev_error - mean_error) < tolerance:
-            break
-        prev_error = mean_error
-    # print('calculate final transformation')
-    # # calculate final transformation
-    # A = np.nan_to_num(A)
-    # src = np.nan_to_num(src)
-    T, _, _, s = best_fit_transform(A[sampler, :], src[:m, :].T)
-
+            # update the current source
+            src = T.dot(src) * s
+            A = (T.dot(np.vstack((A.T, np.ones((1, len(A)))))) * s)[:-1, :].T
+            # check error
+            mean_error = np.mean(distances)
+            if np.abs(prev_error - mean_error) < tolerance:
+                print('Error', b, mean_error)
+                break
+            prev_error = mean_error
+        batch_error.append(mean_error)
+        if len(batch_error) > 2:
+            if batch_error[-2] - batch_error[-1] < batch_tolerance:
+                break
+            if batch_error[-2] < batch_error[-1]:
+                break
+    sampler = random.sample(range(N), o_size)
+    # print(A[sampler, :].shape, B[sampler, :].shape)
+    T, _, _, s = best_fit_transform(A[sampler, :], B[sampler, :])
     return T, distances, i
 
 

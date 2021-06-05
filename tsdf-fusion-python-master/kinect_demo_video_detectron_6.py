@@ -187,8 +187,9 @@ if __name__ == "__main__":
     vol_bnds = np.zeros((3, 2))
     voxel_size = 0.02
     iter = 0
-    backgrounds = []
+    poses = []
     # while True:
+
     for i in range(0, n_frames):
 
         capture = k4a.get_next_capture()
@@ -238,14 +239,15 @@ if __name__ == "__main__":
                                          first_Points3D.T[ind, :])  # A, B // maps A onto B : B = pose*A
                 cam_pose = np.dot(first_pose, pose)
 
-                first_pose = cam_pose
-                first_Points3D = second_Points3D
+                first_pose = cam_pose.copy()
+                first_Points3D = second_Points3D.copy()
 
                 # Compute camera view frustum and extend convex hull
                 view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, cam_pose)
                 vol_bnds[:, 0] = np.minimum(vol_bnds[:, 0], np.amin(view_frust_pts, axis=1))
                 vol_bnds[:, 1] = np.maximum(vol_bnds[:, 1], np.amax(view_frust_pts, axis=1))
-
+            # tsdf_vol.integrate(color_im, depth_im, cam_intr, cam_pose, obs_weight=1.)
+            poses.append(cam_pose)
             iter = iter + 1
 
     # ======================================================================================================== #
@@ -253,54 +255,54 @@ if __name__ == "__main__":
     tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=voxel_size)
     # human_vol = fusion.TSDFVolume(vol_bnds, voxel_size=voxel_size)
     k4a.close()
-    poses = []
+    # poses = []
     # ===============Integrate===============
     n_imgs = len(list_depth_im)
     iter = 0
-    joints_3D = []
-    joints_vols = [fusion.TSDFVolume(vol_bnds, voxel_size=voxel_size) for i in range(17)]
     for iter in range(0, n_imgs):
         print("Fusing frame %d/%d" % (iter + 1, n_imgs))
 
         # Read depth and color image
         depth_im = list_depth_im[iter]
         color_im = list_color_im[iter]
-
+        cam_pose = poses[iter]
+        tsdf_vol.integrate(color_im, depth_im, cam_intr, cam_pose, obs_weight=1.)
+        iter = iter + 1
         # Set first frame as world system
-        if iter == 0:
-            previous_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
-            cam_pose = np.eye(4)
-            previous_pose = cam_pose
-
-        elif iter >= 1:
-            Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
-
-            # Compute camera view frustum and extend convex hull
-            pose, distances, _ = icp(Points3D.T, previous_Points3D.T)  # A, B // maps A onto B : B = pose*A
-            pose = np.dot(previous_pose, pose)
-
-            view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, pose)
-            vol_bnds_seq = np.zeros((3, 2))
-            vol_bnds_seq[:, 0] = np.minimum(vol_bnds_seq[:, 0], np.amin(view_frust_pts, axis=1))
-            vol_bnds_seq[:, 1] = np.maximum(vol_bnds_seq[:, 1], np.amax(view_frust_pts, axis=1))
-            tsdf_vol_seq = fusion.TSDFVolume(vol_bnds_seq, voxel_size=voxel_size)
-            tsdf_vol_seq.integrate(color_im, depth_im, cam_intr, pose, obs_weight=1.)
-            second_Points3D = tsdf_vol_seq.get_point_cloud()[:, 0:3]
-
-            # 누적 pointcloud vertex only
-            # first_Points3D = tsdf_vol.get_partial_point_cloud()
-            first_Points3D = tsdf_vol.get_point_cloud()[:, 0:3]
-
-            pts_size = min(first_Points3D.shape[0], second_Points3D.shape[0])
-            size = min(pts_size, 30000)
-            samples_first = random.sample(range(first_Points3D.shape[0]), size)
-            samples_second = random.sample(range(second_Points3D.shape[0]), size)
-            pose_real, _, _ = icp(second_Points3D[samples_second, :],first_Points3D[samples_first, :])  # A, B // maps A onto B : B = pose*A
-            pose_real = np.dot(previous_pose, pose_real)
-
-            cam_pose = pose_real
-            previous_pose = cam_pose
-            previous_Points3D = Points3D
+        # if iter == 0:
+        #     previous_Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
+        #     cam_pose = np.eye(4)
+        #     previous_pose = cam_pose
+        #
+        # elif iter >= 1:
+        #     Points3D = PointCloud(depth_im, np.linalg.inv(cam_intr))
+        #
+        #     # Compute camera view frustum and extend convex hull
+        #     pose, distances, _ = icp(Points3D.T, previous_Points3D.T)  # A, B // maps A onto B : B = pose*A
+        #     pose = np.dot(previous_pose, pose)
+        #
+        #     view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, pose)
+        #     vol_bnds_seq = np.zeros((3, 2))
+        #     vol_bnds_seq[:, 0] = np.minimum(vol_bnds_seq[:, 0], np.amin(view_frust_pts, axis=1))
+        #     vol_bnds_seq[:, 1] = np.maximum(vol_bnds_seq[:, 1], np.amax(view_frust_pts, axis=1))
+        #     tsdf_vol_seq = fusion.TSDFVolume(vol_bnds_seq, voxel_size=voxel_size)
+        #     tsdf_vol_seq.integrate(color_im, depth_im, cam_intr, pose, obs_weight=1.)
+        #     second_Points3D = tsdf_vol_seq.get_point_cloud()[:, 0:3]
+        #
+        #     # 누적 pointcloud vertex only
+        #     # first_Points3D = tsdf_vol.get_partial_point_cloud()
+        #     first_Points3D = tsdf_vol.get_point_cloud()[:, 0:3]
+        #
+        #     pts_size = min(first_Points3D.shape[0], second_Points3D.shape[0])
+        #     size = min(pts_size, 30000)
+        #     samples_first = random.sample(range(first_Points3D.shape[0]), size)
+        #     samples_second = random.sample(range(second_Points3D.shape[0]), size)
+        #     pose_real, _, _ = icp(second_Points3D[samples_second, :],first_Points3D[samples_first, :])  # A, B // maps A onto B : B = pose*A
+        #     pose_real = np.dot(previous_pose, pose_real)
+        #
+        #     cam_pose = pose_real
+        #     previous_pose = cam_pose
+        #     previous_Points3D = Points3D
 
             # output = joint_model(color_im)
             # joints, color_filtered, depth_filtered = filter_joint(output, color_im, depth_im)
@@ -311,8 +313,7 @@ if __name__ == "__main__":
 
         # poses.append(previous_pose)
         # Integrate observation into voxel volume (assume color aligned with depth)
-        tsdf_vol.integrate(color_im, depth_im, cam_intr, cam_pose, obs_weight=1.)
-        iter = iter + 1
+
 
     fig = plt.figure(figsize=(8, 8))
     ax = fig.add_subplot(projection='3d')  # Axe3D object
@@ -342,7 +343,7 @@ if __name__ == "__main__":
     #     depth_im[depth_im >= threshold] = 0
     #     pose = poses[i]
     #     human_vol.integrate(color_im, depth_im, cam_intr, pose, obs_weight=1.)
-
+    #
     # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
     print("Saving mesh")
     verts, faces, norms, colors = tsdf_vol.get_mesh()
