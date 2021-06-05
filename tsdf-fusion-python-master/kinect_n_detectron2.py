@@ -43,6 +43,7 @@ def filter_human(output):
     x, y = np.nonzero(1 - mask.numpy())
     return x, y
 
+
 def filter_joint(output):
     joints = output["instances"].pred_keypoints[0][:, :2].numpy()
     return joints
@@ -64,42 +65,28 @@ def joint_to_3D(joints, Inverse, pose, depth_im):
     for i in range(17):
         xx, yy = joints[i]
         d = depth_im[int(round(yy)), int(round(xx))]
-        U = d * np.dot(Inverse, np.array([xx, yy, 1]).T)
-        Joints[:, i] = np.dot(pose, np.array([U[0], U[1], U[2], 1]))[:-1]
+        U = d * np.dot(Inverse, np.array([xx, yy, 1]).T)    # 3X1
+        Joints[:, i] = np.dot(pose, np.array([U[0], U[1], U[2], 1]))[:-1]   # [4x4 @ 4x1][0, 1, 2]
     return Joints
 
 
 def simple_bundle(joint_3D: list):
     # Outlier 날리고 평균 구하기.
     joints_3D = np.array(joint_3D)  # N * 3 * 17
-    if len(joint_3D) > 50:
-        joint_val = [[0, 0, 0] for _ in range(17)]
-        counts = [[0.1, 0.1, 0.1] for _ in range(17)]
-        mean = np.mean(joints_3D, axis=0)  # 3x17
-        std = np.std(joints_3D, axis=0)  # 3x17
-        thr_low = mean + 2 * std
-        thr_high = mean - 2 * std
+    if len(joint_3D) > 20:
+        m = np.mean(joints_3D, axis=0)
+        s = np.std(joints_3D, axis=0)
+        thr = m + 2*s
+        thr2 = m - 2*s
+        vals = np.zeros((3, 17))
+        count = np.zeros((3, 17))
         for i in range(len(joints_3D)):
-            for j in range(17):
-                if thr_low[0, j] < joints_3D[i, 0, j] < thr_high[0, j]:
-                    joint_val[j][0] += joints_3D[i, 0, j]
-                    counts[j][0] += 1
-                if thr_low[1, j] < joints_3D[i, 1, j] < thr_high[1, j]:
-                    joint_val[j][1] += joints_3D[i, 1, j]
-                    counts[j][1] += 1
-                if thr_low[2, j] < joints_3D[i, 2, j] < thr_high[2, j]:
-                    joint_val[j][2] += joints_3D[i, 2, j]
-                    counts[j][2] += 1
-        result = np.zeros((3, 17))
-        for i, (val, count) in enumerate(zip(joint_val, counts)):
-            xv = val[0]
-            xc = count[0]
-            yv = val[1]
-            yc = count[1]
-            zv = val[2]
-            zc = count[2]
-            result[:, i] = xv / xc, yv / yc, zv / zc
-
+            for k in range(3):
+                for j in range(17):
+                    if thr2[k, j] <= joints_3D[i, k, j] <= thr[k, j]:
+                        vals[k, j] += joints_3D[i, k, j]
+                        count[k, j] += 1
+        result = vals / count
     else:
         result = np.mean(joints_3D, axis=0)
     return result
@@ -132,8 +119,8 @@ if __name__ == "__main__":
 
     # Load video file
     # filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\video1.mkv'
-    filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\human6.mkv'
-    n_frames = 4
+    filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\yuna2.mkv'
+    n_frames = 15
 
 
     k4a = PyK4APlayback(filename)
@@ -293,8 +280,8 @@ if __name__ == "__main__":
     for i in range(17):
         ax.scatter(mesh_joint[0, i], mesh_joint[1, i], mesh_joint[2, i], c='magenta') # projection  P = 4XN
         ax.text(mesh_joint[0, i], mesh_joint[1, i], mesh_joint[2, i], joint_info[i], fontsize=10)
-    for j in range(len(verts)):
-        ax.scatter(verts_[0, j], verts_[1, j], verts_[2, j], c='bluerk')
+    for j in range(int(len(verts) / 3)):
+        ax.scatter(verts_[0, 3* j], verts_[1, 3*j], verts_[2, 3*j], c='blue')
     plt.show()
     # Get point cloud from voxel volume and save to disk (can be viewed with Meshlab)
     # print("Saving point cloud")

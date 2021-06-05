@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 # try:
-from ICP import *
+# from ICP import *
 # except Exception as err:
 #     from icp_modules.ICP import *
 
@@ -164,7 +164,7 @@ def info(playback: PyK4APlayback):
 
 
 model = SEG_model()
-filename = 'C:\\Users\\82106\\PycharmProjects\\dino_lib\\azure\\sample2.mkv'
+filename = r'C:\Users\82106\PycharmProjects\dino_lib\python_kinect_fusion\tsdf-fusion-python-master\yuna2.mkv'
 offset = 0
 
 playback = PyK4APlayback(filename)
