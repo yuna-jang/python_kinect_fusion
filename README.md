@@ -1,15 +1,24 @@
 # python_kinect_fusion
 
-**Introduction**
+# Introduction
+
 2021.03 ~ 2021.06
+
 This repository is about 3D RECONSTRUCTION + human segmentation.
 
-**Getting Started**
+
+# Getting Started
+
 python 3.x
+
 Need color+depth data
 
-**Build and Test**
+
+# Build and Test
+
 demo
 
-**Contribute**
+
+# Contribute
+
 Yuna Jang, Minsu Kim
