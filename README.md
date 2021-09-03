@@ -1,8 +1,5 @@
 # python_kinect_fusion
+2021.03 ~ 2021.06
 
-kinect_realtime_demo.py 
- - 장윤아 작업
- 
- 
-kinect_realtime_demo_kms.py
- - 김민수 작업
+This repository is about 3D RECONSTRUCTION.
+
