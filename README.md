@@ -16,7 +16,8 @@ Need color+depth data
 
 # Build and Test
 
-demo
+* demo.py
+result : human_mesh_seg.obj
 
 
 # Contribute
